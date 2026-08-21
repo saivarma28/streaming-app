@@ -48,7 +48,7 @@ export default function MovieDetails() {
 
   const handlePlayClick = () => {
     if (!movie) return;
-    if (!movie.videoStreamId) {
+    if (!movie.hlsUrl) {
       alert("This movie does not have a streaming video assigned yet.");
       return;
     }
@@ -186,7 +186,7 @@ export default function MovieDetails() {
 
             {/* Play CTA Button */}
             <div className="flex flex-wrap gap-4 items-center">
-              {movie.videoStreamId ? (
+              {movie.hlsUrl ? (
                 <button
                   onClick={handlePlayClick}
                   className="flex items-center gap-2.5 px-10 py-4 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_25px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_30px_rgba(229,9,20,0.65)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"

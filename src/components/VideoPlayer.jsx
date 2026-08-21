@@ -1,97 +1,142 @@
 import React, { useEffect, useRef, useState } from "react";
-import { FiPlay, FiLoader, FiAlertCircle } from "react-icons/fi";
+import Hls from "hls.js";
+import { FiLoader, FiAlertCircle } from "react-icons/fi";
 
 /**
- * Reusable premium Video Player wrapping Cloudflare Stream Player.
+ * Reusable premium Video Player wrapping an HLS stream.
+ * Plays HLS .m3u8 files using hls.js (or native Safari fallback).
  * Tracks progress and triggers updates for watch history logs.
  * 
- * @param {string} videoStreamId - Cloudflare Stream video ID (UID)
+ * @param {string} hlsUrl - GCS public HLS master playlist URL
  * @param {number} startPosition - Time in seconds to resume playback
  * @param {function} onProgress - Callback triggered on playback time update: (currentTime, duration, completed)
  * @param {function} onComplete - Callback triggered when movie finishes playing
  */
-export default function VideoPlayer({ videoStreamId, startPosition = 0, onProgress, onComplete }) {
-  const iframeRef = useRef(null);
+export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onComplete }) {
+  const videoRef = useRef(null);
+  const hlsRef = useRef(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const playerRef = useRef(null);
-  const progressTimerRef = useRef(null);
 
-  // Load the Cloudflare Stream Player SDK
   useEffect(() => {
-    let scriptLoaded = false;
-    const scriptId = "cloudflare-stream-sdk";
+    const video = videoRef.current;
+    if (!video || !hlsUrl) return;
 
-    const initPlayer = () => {
-      if (!window.Stream || !iframeRef.current) return;
-      try {
-        // Instantiate the Stream SDK wrapper for the iframe
-        const player = window.Stream(iframeRef.current);
-        playerRef.current = player;
+    setLoading(true);
+    setError(false);
 
-        player.addEventListener("ready", () => {
-          setLoading(false);
-          // Seek to starting position if provided
-          if (startPosition > 0) {
-            player.currentTime = startPosition;
-          }
-        });
+    // Clean up previous Hls instance
+    if (hlsRef.current) {
+      hlsRef.current.destroy();
+      hlsRef.current = null;
+    }
 
-        // Set up events
-        player.addEventListener("play", () => {
-          setLoading(false);
-        });
+    const handleCanPlay = () => {
+      setLoading(false);
+    };
 
-        player.addEventListener("timeupdate", () => {
-          const currentTime = player.currentTime;
-          const duration = player.duration;
+    const handlePlay = () => {
+      setLoading(false);
+    };
 
-          if (duration > 0 && onProgress) {
-            const completed = currentTime >= duration - 5; // Mark complete within last 5 seconds
-            onProgress(Math.floor(currentTime), Math.floor(duration), completed);
-          }
-        });
+    const handleTimeUpdate = () => {
+      const currentTime = video.currentTime;
+      const duration = video.duration;
 
-        player.addEventListener("ended", () => {
-          if (onComplete) onComplete();
-        });
-
-        player.addEventListener("error", (err) => {
-          console.error("Cloudflare Stream player error:", err);
-          setError(true);
-          setLoading(false);
-        });
-      } catch (err) {
-        console.error("Failed to initialize Cloudflare Stream SDK:", err);
-        setError(true);
+      if (duration > 0 && onProgress) {
+        const completed = currentTime >= duration - 5; // Mark complete within last 5 seconds
+        onProgress(Math.floor(currentTime), Math.floor(duration), completed);
       }
     };
 
-    // If script already exists in doc, initialize directly
-    if (document.getElementById(scriptId)) {
-      initPlayer();
-    } else {
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://embed.videodelivery.net/embed/sdk.latest.js";
-      script.async = true;
-      script.onload = () => {
-        initPlayer();
-      };
-      script.onerror = () => {
-        console.error("Failed to load Cloudflare Stream SDK script.");
+    const handleEnded = () => {
+      if (onComplete) onComplete();
+    };
+
+    const handleError = (e) => {
+      console.error("HTML5 video error:", e);
+      if (video.error) {
         setError(true);
         setLoading(false);
-      };
-      document.body.appendChild(script);
+      }
+    };
+
+    video.addEventListener("canplay", handleCanPlay);
+    video.addEventListener("play", handlePlay);
+    video.addEventListener("timeupdate", handleTimeUpdate);
+    video.addEventListener("ended", handleEnded);
+    video.addEventListener("error", handleError);
+
+    // Load HLS source
+    if (Hls.isSupported()) {
+      const hls = new Hls({
+        enableWorker: true,
+        lowLatencyMode: true,
+      });
+      hlsRef.current = hls;
+
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
+
+      hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        if (startPosition > 0) {
+          video.currentTime = startPosition;
+        }
+        video.play().catch((err) => {
+          console.warn("Autoplay blocked by browser policy:", err.message);
+        });
+      });
+
+      hls.on(Hls.Events.ERROR, (event, data) => {
+        console.error("hls.js error:", data);
+        if (data.fatal) {
+          switch (data.type) {
+            case Hls.ErrorTypes.NETWORK_ERROR:
+              console.warn("Fatal network error. Attempting to recover...");
+              hls.startLoad();
+              break;
+            case Hls.ErrorTypes.MEDIA_ERROR:
+              console.warn("Fatal media error. Attempting to recover...");
+              hls.recoverMediaError();
+              break;
+            default:
+              console.error("Unrecoverable HLS playback error");
+              setError(true);
+              hls.destroy();
+              break;
+          }
+        }
+      });
+    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Fallback for native Safari HLS playback
+      video.src = hlsUrl;
+      video.addEventListener("loadedmetadata", () => {
+        if (startPosition > 0) {
+          video.currentTime = startPosition;
+        }
+        video.play().catch((err) => {
+          console.warn("Autoplay blocked by native browser policy:", err.message);
+        });
+      });
+    } else {
+      console.error("HLS streaming is not supported in this browser.");
+      setError(true);
+      setLoading(false);
     }
 
     return () => {
-      if (progressTimerRef.current) {
-        clearInterval(progressTimerRef.current);
+      video.removeEventListener("canplay", handleCanPlay);
+      video.removeEventListener("play", handlePlay);
+      video.removeEventListener("timeupdate", handleTimeUpdate);
+      video.removeEventListener("ended", handleEnded);
+      video.removeEventListener("error", handleError);
+
+      if (hlsRef.current) {
+        hlsRef.current.destroy();
+        hlsRef.current = null;
       }
     };
-  }, [videoStreamId, startPosition]);
+  }, [hlsUrl, startPosition]);
 
   if (error) {
     return (
@@ -99,14 +144,11 @@ export default function VideoPlayer({ videoStreamId, startPosition = 0, onProgre
         <FiAlertCircle className="h-12 w-12 text-[#e50914] mb-4" />
         <h3 className="text-xl font-bold mb-2">Playback Error</h3>
         <p className="text-sm text-gray-400 max-w-md font-light">
-          We are unable to play this video. This might be due to an invalid stream ID or network connection problems.
+          We are unable to play this video. This might be due to incorrect storage permissions, CORS block, or network connection problems.
         </p>
       </div>
     );
   }
-
-  // Construct Cloudflare Stream direct playback embed URL
-  const embedUrl = `https://iframe.videodelivery.net/${videoStreamId}?autoplay=true&letterbox=false&preload=auto`;
 
   return (
     <div className="relative w-full h-full bg-black overflow-hidden group">
@@ -120,15 +162,13 @@ export default function VideoPlayer({ videoStreamId, startPosition = 0, onProgre
         </div>
       )}
 
-      {/* Cloudflare Stream embed iframe */}
-      <iframe
-        ref={iframeRef}
-        src={embedUrl}
-        className="w-full h-full border-0 absolute inset-0 z-10"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-        allowFullScreen
-        title="Streaming Media Player"
-      ></iframe>
+      {/* HTML5 Native Video Tag */}
+      <video
+        ref={videoRef}
+        className="w-full h-full z-10 object-contain"
+        controls
+        playsInline
+      />
     </div>
   );
 }

@@ -25,7 +25,7 @@ export default function VideoPlayerPage() {
         const token = await currentUser.getIdToken();
         const movieData = await getMovieById(token, id);
         
-        if (!movieData.movie.videoStreamId) {
+        if (!movieData.movie.hlsUrl) {
           throw new Error("This movie has no streaming content associated.");
         }
         
@@ -75,6 +75,7 @@ export default function VideoPlayerPage() {
     );
   }
 
+  // Handle errors or missing movie records
   if (error || !movie) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
@@ -83,6 +84,39 @@ export default function VideoPlayerPage() {
           <h2 className="text-xl font-bold mb-3 uppercase tracking-wider">Player Error</h2>
           <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
             {error || "Could not launch streaming session."}
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-colors cursor-pointer border border-white/10"
+          >
+            <FiArrowLeft className="h-4 w-4" /> Back to Movie Details
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle transcoding status warnings
+  if (movie.transcodingStatus !== "READY") {
+    let statusMessage = "Your video is still being processed. Please check again shortly.";
+    let isFailed = false;
+
+    if (movie.transcodingStatus === "FAILED") {
+      statusMessage = "Video processing failed.";
+      isFailed = true;
+    } else if (movie.transcodingStatus === "UPLOADING") {
+      statusMessage = "Your video is currently uploading. Please check again shortly.";
+    }
+
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
+        <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-white/5 shadow-2xl">
+          <FiAlertCircle className={`h-12 w-12 mx-auto mb-4 ${isFailed ? "text-[#e50914]" : "text-amber-500 animate-pulse"}`} />
+          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider">
+            {isFailed ? "Processing Failed" : "Processing Video"}
+          </h2>
+          <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
+            {statusMessage}
           </p>
           <button
             onClick={() => navigate(-1)}
@@ -114,7 +148,7 @@ export default function VideoPlayerPage() {
       {/* Responsive Video Player */}
       <div className="w-full h-full">
         <VideoPlayer
-          videoStreamId={movie.videoStreamId}
+          hlsUrl={movie.hlsUrl}
           startPosition={startPosition}
           onProgress={handleProgress}
           onComplete={handleComplete}

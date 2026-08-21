@@ -28,7 +28,11 @@ model Movie {
   thumbnailUrl    String?
   backdropUrl     String?
   trailerUrl      String?
-  videoStreamId   String?
+  videoUrl          String?
+  hlsUrl            String?
+  sourceVideoPath   String?
+  transcoderJobName String?
+  transcodingStatus String?        @default("READY")
   duration        Int
   releaseYear     Int
   maturityRating  String?

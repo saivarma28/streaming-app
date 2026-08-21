@@ -3,3 +3,10 @@ node_modules
 .env
 
 /generated/prisma
+
+# Google Cloud Service Account Credentials
+*-key.json
+*key.json
+service-account.json
+credentials.json
+

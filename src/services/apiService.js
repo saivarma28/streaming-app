@@ -403,4 +403,59 @@ export async function updateWatchHistory(token, movieId, progress, completed = f
   }
 }
 
+/**
+ * Retrieve all registered users. (Admin only)
+ * Hits GET /api/users
+ * 
+ * @param {string} token - Firebase ID token
+ * @returns {Promise<{success: boolean, users: array}>}
+ */
+export async function getAllUsers(token) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to retrieve all users.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getAllUsers API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Retrieve system-wide watch histories. (Admin only)
+ * Hits GET /api/watch-history/all
+ * 
+ * @param {string} token - Firebase ID token
+ * @returns {Promise<{success: boolean, history: array}>}
+ */
+export async function getAllWatchHistories(token) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/watch-history/all`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to retrieve watch histories.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getAllWatchHistories API Error:", error.message);
+    throw error;
+  }
+}
+
+
 

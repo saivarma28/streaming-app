@@ -1,10 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { Link, NavLink, useNavigate } from "react-router-dom";
+import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { getUserMe } from "../services/apiService";
 
 export default function Navbar() {
+  const { pathname } = useLocation();
+
+  // Hide global navbar on admin or watch pages to avoid visual overlaps
+  if (pathname.startsWith("/admin") || pathname.startsWith("/watch")) {
+    return null;
+  }
+
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [role, setRole] = useState("user");

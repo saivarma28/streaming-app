@@ -214,3 +214,35 @@ export async function updateWatchHistory(req, res) {
     });
   }
 }
+
+/**
+ * Retrieves all watch history records. (Admin only)
+ * GET /api/watch-history/all
+ */
+export async function getAllWatchHistories(req, res) {
+  try {
+    const history = await prisma.watchHistory.findMany({
+      include: {
+        user: true,
+        movie: {
+          include: {
+            genres: true
+          }
+        }
+      },
+      orderBy: { lastWatchedAt: "desc" }
+    });
+
+    return res.status(200).json({
+      success: true,
+      history
+    });
+  } catch (error) {
+    console.error("getAllWatchHistories Controller Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while retrieving watch histories."
+    });
+  }
+}
+

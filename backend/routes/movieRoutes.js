@@ -5,7 +5,8 @@ import {
   getMovieById,
   createMovie,
   updateMovie,
-  deleteMovie
+  deleteMovie,
+  getTranscodingStatus
 } from "../controllers/movieController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
@@ -25,6 +26,9 @@ router.get("/", authMiddleware, getMovies);
 
 // GET /api/movies/:id - Retrieves details (public/auth required, handles unpublished block for normal users)
 router.get("/:id", authMiddleware, getMovieById);
+
+// GET /api/movies/:id/transcoding-status - Retrieves transcoding status (auth required)
+router.get("/:id/transcoding-status", authMiddleware, getTranscodingStatus);
 
 // POST /api/movies - Creates movie & handles direct stream video upload (Admin only)
 router.post("/", authMiddleware, adminMiddleware, upload.single("video"), createMovie);

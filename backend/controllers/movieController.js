@@ -1,5 +1,6 @@
 import { prisma } from "../config/db.js";
-import { uploadToCloudflareStream } from "../services/cloudflareStream.js";
+import { uploadToGCS } from "../services/googleCloudStorage.js";
+import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
 
 /**
  * Retrieves movies list.
@@ -110,7 +111,7 @@ export async function getMovieById(req, res) {
 
 /**
  * Creates a new movie. (Admin only)
- * Optionally handles uploading a video file directly to Cloudflare Stream.
+ * Optionally handles uploading a video file directly to Google Cloud Storage.
  * 
  * POST /api/movies
  */
@@ -121,7 +122,6 @@ export async function createMovie(req, res) {
     thumbnailUrl,
     backdropUrl,
     trailerUrl,
-    videoStreamId,
     duration,
     releaseYear,
     maturityRating,
@@ -171,38 +171,21 @@ export async function createMovie(req, res) {
   }
 
   try {
-    // 1. Process Video File Upload to Cloudflare Stream if provided
-    if (req.file) {
-      try {
-        const uploadResult = await uploadToCloudflareStream(
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype
-        );
-        videoStreamId = uploadResult.videoStreamId;
-      } catch (uploadError) {
-        return res.status(500).json({
-          success: false,
-          message: `Video upload failed: ${uploadError.message}`
-        });
-      }
-    }
-
-    // 2. Insert Movie Record into PostgreSQL via Prisma
-    const movie = await prisma.movie.create({
+    // 1. Insert Movie Record into PostgreSQL via Prisma first
+    let movie = await prisma.movie.create({
       data: {
         title,
         description,
         thumbnailUrl,
         backdropUrl,
         trailerUrl,
-        videoStreamId: videoStreamId || null,
         duration: parsedDuration,
         releaseYear: parsedReleaseYear,
         maturityRating: maturityRating || null,
         language: language || "English",
         isPremium: parsedIsPremium,
         isPublished: parsedIsPublished,
+        transcodingStatus: req.file ? "UPLOADING" : "READY",
         genres: {
           connect: parsedGenreIds.map((id) => ({ id: parseInt(id) }))
         }
@@ -211,6 +194,49 @@ export async function createMovie(req, res) {
         genres: true
       }
     });
+
+    // 2. Process Video File Upload to Google Cloud if provided
+    if (req.file) {
+      try {
+        const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
+        const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
+        
+        const outputFolder = `movies/${movie.id}/transcoded/`;
+        const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
+        
+        // Create Transcoder job
+        const jobInfo = await createTranscodingJob(inputUri, outputUri);
+        
+        const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
+        
+        movie = await prisma.movie.update({
+          where: { id: movie.id },
+          data: {
+            sourceVideoPath: inputUri,
+            transcoderJobName: jobInfo.jobName,
+            transcodingStatus: "PROCESSING",
+            hlsUrl: hlsUrl
+          },
+          include: {
+            genres: true
+          }
+        });
+      } catch (uploadError) {
+        console.error("GCP Upload/Transcode process failed:", uploadError.message);
+        // Mark status as FAILED
+        movie = await prisma.movie.update({
+          where: { id: movie.id },
+          data: { transcodingStatus: "FAILED" },
+          include: { genres: true }
+        });
+        
+        return res.status(500).json({
+          success: false,
+          message: `Video upload/transcoding setup failed: ${uploadError.message}`,
+          movie
+        });
+      }
+    }
 
     return res.status(201).json({
       success: true,
@@ -227,7 +253,7 @@ export async function createMovie(req, res) {
 
 /**
  * Updates an existing movie record. (Admin only)
- * Optionally handles uploading/replacing a video file on Cloudflare Stream.
+ * Optionally handles uploading/replacing a video file on Google Cloud Storage.
  * 
  * PUT /api/movies/:id
  */
@@ -239,7 +265,6 @@ export async function updateMovie(req, res) {
     thumbnailUrl,
     backdropUrl,
     trailerUrl,
-    videoStreamId,
     duration,
     releaseYear,
     maturityRating,
@@ -284,19 +309,42 @@ export async function updateMovie(req, res) {
       }
     }
 
-    // 1. Process Video File Upload to Cloudflare Stream if replacing
+    let uploadResult = {};
+    // 1. Process Video File Upload to Google Cloud if replacing
     if (req.file) {
       try {
-        const uploadResult = await uploadToCloudflareStream(
-          req.file.buffer,
-          req.file.originalname,
-          req.file.mimetype
-        );
-        videoStreamId = uploadResult.videoStreamId;
+        // Temporarily mark status as UPLOADING during the file write process
+        await prisma.movie.update({
+          where: { id: existingMovie.id },
+          data: { transcodingStatus: "UPLOADING" }
+        });
+
+        const destinationPath = `movies/${existingMovie.id}/source_${Date.now()}_${req.file.originalname}`;
+        const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
+        
+        const outputFolder = `movies/${existingMovie.id}/transcoded/`;
+        const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
+        
+        const jobInfo = await createTranscodingJob(inputUri, outputUri);
+        
+        const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
+        
+        uploadResult = {
+          sourceVideoPath: inputUri,
+          transcoderJobName: jobInfo.jobName,
+          transcodingStatus: "PROCESSING",
+          hlsUrl: hlsUrl
+        };
       } catch (uploadError) {
+        console.error("GCP Upload/Transcode process failed:", uploadError.message);
+        // Mark status as FAILED in DB
+        await prisma.movie.update({
+          where: { id: existingMovie.id },
+          data: { transcodingStatus: "FAILED" }
+        });
         return res.status(500).json({
           success: false,
-          message: `Video upload failed: ${uploadError.message}`
+          message: `Video upload/transcoding replacement failed: ${uploadError.message}`
         });
       }
     }
@@ -310,7 +358,6 @@ export async function updateMovie(req, res) {
         thumbnailUrl: thumbnailUrl !== undefined ? thumbnailUrl : undefined,
         backdropUrl: backdropUrl !== undefined ? backdropUrl : undefined,
         trailerUrl: trailerUrl !== undefined ? trailerUrl : undefined,
-        videoStreamId: videoStreamId !== undefined ? videoStreamId : undefined,
         duration: parsedDuration,
         releaseYear: parsedReleaseYear,
         maturityRating: maturityRating !== undefined ? maturityRating : undefined,
@@ -319,7 +366,8 @@ export async function updateMovie(req, res) {
         isPublished: parsedIsPublished,
         genres: parsedGenreIds !== undefined ? {
           set: parsedGenreIds.map((gid) => ({ id: parseInt(gid) }))
-        } : undefined
+        } : undefined,
+        ...uploadResult
       },
       include: {
         genres: true
@@ -374,3 +422,60 @@ export async function deleteMovie(req, res) {
     });
   }
 }
+
+/**
+ * Checks and updates the GCP transcoding job status.
+ * GET /api/movies/:id/transcoding-status
+ */
+export async function getTranscodingStatus(req, res) {
+  const { id } = req.params;
+
+  try {
+    const movie = await prisma.movie.findUnique({
+      where: { id: parseInt(id) }
+    });
+
+    if (!movie) {
+      return res.status(404).json({
+        success: false,
+        message: "Movie not found."
+      });
+    }
+
+    // If status is PROCESSING and there is a transcoder job name, we poll Google Cloud
+    if (movie.transcodingStatus === "PROCESSING" && movie.transcoderJobName) {
+      try {
+        const jobStatus = await getTranscodingJobStatus(movie.transcoderJobName);
+        let newStatus = movie.transcodingStatus;
+
+        if (jobStatus.state === "SUCCEEDED") {
+          newStatus = "READY";
+        } else if (jobStatus.state === "FAILED") {
+          newStatus = "FAILED";
+        }
+
+        if (newStatus !== movie.transcodingStatus) {
+          await prisma.movie.update({
+            where: { id: parseInt(id) },
+            data: { transcodingStatus: newStatus }
+          });
+          movie.transcodingStatus = newStatus;
+        }
+      } catch (err) {
+        console.warn("Failed to check Google Transcoding job status:", err.message);
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      status: movie.transcodingStatus
+    });
+  } catch (error) {
+    console.error("getTranscodingStatus Controller Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while fetching transcoding status."
+    });
+  }
+}
+

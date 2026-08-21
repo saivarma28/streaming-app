@@ -160,3 +160,27 @@ export async function updateMe(req, res) {
     });
   }
 }
+
+/**
+ * Retrieves all user profiles. (Admin only)
+ * GET /api/users
+ */
+export async function getAllUsers(req, res) {
+  try {
+    const users = await prisma.user.findMany({
+      orderBy: { createdAt: "desc" }
+    });
+
+    return res.status(200).json({
+      success: true,
+      users
+    });
+  } catch (error) {
+    console.error("getAllUsers Controller Error:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "An error occurred while retrieving user list."
+    });
+  }
+}
+
