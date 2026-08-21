@@ -67,8 +67,9 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
     video.addEventListener("ended", handleEnded);
     video.addEventListener("error", handleError);
 
-    // Load HLS source
-    if (Hls.isSupported()) {
+    // Load HLS source if the URL points to an HLS manifest (.m3u8)
+    const isHls = hlsUrl.toLowerCase().includes(".m3u8") || hlsUrl.toLowerCase().includes("manifest");
+    if (isHls && Hls.isSupported()) {
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: true,
@@ -107,8 +108,8 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
           }
         }
       });
-    } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Fallback for native Safari HLS playback
+    } else {
+      // Fallback for non-HLS (MP4/WebM) or native Safari HLS playback
       video.src = hlsUrl;
       video.addEventListener("loadedmetadata", () => {
         if (startPosition > 0) {
@@ -118,10 +119,6 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
           console.warn("Autoplay blocked by native browser policy:", err.message);
         });
       });
-    } else {
-      console.error("HLS streaming is not supported in this browser.");
-      setError(true);
-      setLoading(false);
     }
 
     return () => {

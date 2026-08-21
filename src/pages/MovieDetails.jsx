@@ -199,6 +199,17 @@ export default function MovieDetails() {
                   Currently Unavailable: Streaming source has not been linked to this title.
                 </div>
               )}
+
+              {movie.trailerUrl && (
+                <a
+                  href={movie.trailerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 px-10 py-4 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"
+                >
+                  Watch Trailer
+                </a>
+              )}
             </div>
           </div>
         </div>

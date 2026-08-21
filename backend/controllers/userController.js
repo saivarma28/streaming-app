@@ -24,7 +24,11 @@ export async function syncUser(req, res) {
     });
 
     if (!user) {
-      // 2. Create a new user record (role is strictly defaulted to 'user')
+      // Promote to admin if they are the first user in PostgreSQL or their email is saivarma9333@gmail.com
+      const userCount = await prisma.user.count();
+      const isAdmin = userCount === 0 || email === "saivarma9333@gmail.com";
+
+      // 2. Create a new user record (role is strictly defaulted to 'user' unless promoted)
       user = await prisma.user.create({
         data: {
           firebaseUid,
@@ -32,21 +36,23 @@ export async function syncUser(req, res) {
           name: name || "User",
           photoURL,
           isEmailVerified: emailVerified,
-          role: "user" // Enforces secure user boundary; normal users cannot elevate themselves to admin
+          role: isAdmin ? "admin" : "user"
         }
       });
-      console.log(`Database sync: Created new PostgreSQL user for uid ${firebaseUid}`);
+      console.log(`Database sync: Created new PostgreSQL user (${user.role}) for uid ${firebaseUid}`);
     } else {
-      // 3. Update existing user details that may have changed (e.g. from Google login profile)
+      // Update existing user details, and ensure saivarma9333@gmail.com gets upgraded to admin
+      const shouldBeAdmin = email === "saivarma9333@gmail.com";
       user = await prisma.user.update({
         where: { firebaseUid },
         data: {
           name: name || user.name,
           photoURL: photoURL || user.photoURL,
-          isEmailVerified: emailVerified || user.isEmailVerified
+          isEmailVerified: emailVerified || user.isEmailVerified,
+          role: shouldBeAdmin ? "admin" : user.role
         }
       });
-      console.log(`Database sync: Updated existing PostgreSQL user for uid ${firebaseUid}`);
+      console.log(`Database sync: Updated existing PostgreSQL user (${user.role}) for uid ${firebaseUid}`);
     }
 
     return res.status(200).json({

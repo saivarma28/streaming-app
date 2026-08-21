@@ -13,6 +13,8 @@ import {
   deleteMovie,
   getGenres,
   createGenre,
+  updateGenre,
+  deleteGenre,
   getAllUsers,
   getAllWatchHistories
 } from "../services/apiService";
@@ -62,6 +64,8 @@ export default function AdminDashboard() {
 
   // Genre Form State
   const [newGenreName, setNewGenreName] = useState("");
+  const [editingGenreId, setEditingGenreId] = useState(null);
+  const [editingGenreName, setEditingGenreName] = useState("");
 
   // Load All Dashboard Data
   useEffect(() => {
@@ -282,6 +286,60 @@ export default function AdminDashboard() {
     } catch (err) {
       console.error(err);
       setError(err.message || "Failed to create genre.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleGenreEditClick = (genre) => {
+    setEditingGenreId(genre.id);
+    setEditingGenreName(genre.name);
+  };
+
+  const handleGenreCancelEdit = () => {
+    setEditingGenreId(null);
+    setEditingGenreName("");
+  };
+
+  const handleGenreUpdateSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingGenreName.trim() || !editingGenreId) return;
+    setError("");
+    setSuccessMsg("");
+    setActionLoading(true);
+    try {
+      const token = await currentUser.getIdToken();
+      await updateGenre(token, editingGenreId, editingGenreName);
+      setSuccessMsg(`Genre updated successfully.`);
+      setEditingGenreId(null);
+      setEditingGenreName("");
+      const genresData = await getGenres(token);
+      setGenres(genresData.genres || []);
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to update genre.");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleGenreDeleteClick = async (genreId, name) => {
+    if (!window.confirm(`Are you sure you want to delete the genre "${name}"? Movies associated with this genre will lose their link.`)) {
+      return;
+    }
+    setError("");
+    setSuccessMsg("");
+    setActionLoading(true);
+    try {
+      const token = await currentUser.getIdToken();
+      await deleteGenre(token, genreId);
+      setSuccessMsg(`Genre "${name}" successfully deleted.`);
+      const genresData = await getGenres(token);
+      setGenres(genresData.genres || []);
+      await refreshMovies();
+    } catch (err) {
+      console.error(err);
+      setError(err.message || "Failed to delete genre.");
     } finally {
       setActionLoading(false);
     }
@@ -1067,28 +1125,66 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
                   {/* Left form */}
                   <div className="bg-[#11131e] rounded-2xl border border-white/5 p-6 shadow-2xl h-fit text-left">
-                    <h3 className="text-md font-bold uppercase tracking-wider text-white mb-4">Add Genre</h3>
-                    <form onSubmit={handleGenreSubmit} className="space-y-4">
-                      <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Genre Name</label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Sci-Fi"
-                          value={newGenreName}
-                          onChange={(e) => setNewGenreName(e.target.value)}
-                          className="w-full rounded-xl border border-white/5 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 focus:border-red-500/40 focus:bg-white/10 outline-none transition-all"
-                        />
-                      </div>
-                      <button
-                        type="submit"
-                        disabled={actionLoading}
-                        className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs"
-                      >
-                        {actionLoading ? <FiLoader className="h-4 w-4 animate-spin" /> : <FiFolderPlus className="h-4 w-4" />}
-                        Save Genre
-                      </button>
-                    </form>
+                    {editingGenreId ? (
+                      <>
+                        <h3 className="text-md font-bold uppercase tracking-wider text-white mb-4">Edit Genre</h3>
+                        <form onSubmit={handleGenreUpdateSubmit} className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Genre Name</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Sci-Fi"
+                              value={editingGenreName}
+                              onChange={(e) => setEditingGenreName(e.target.value)}
+                              className="w-full rounded-xl border border-white/5 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 focus:border-red-500/40 focus:bg-white/10 outline-none transition-all"
+                            />
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="submit"
+                              disabled={actionLoading}
+                              className="flex-1 flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs"
+                            >
+                              {actionLoading ? <FiLoader className="h-4 w-4 animate-spin" /> : <FiFolderPlus className="h-4 w-4" />}
+                              Save
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleGenreCancelEdit}
+                              className="py-3 px-4 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold transition-all cursor-pointer text-xs"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      </>
+                    ) : (
+                      <>
+                        <h3 className="text-md font-bold uppercase tracking-wider text-white mb-4">Add Genre</h3>
+                        <form onSubmit={handleGenreSubmit} className="space-y-4">
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Genre Name</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Sci-Fi"
+                              value={newGenreName}
+                              onChange={(e) => setNewGenreName(e.target.value)}
+                              className="w-full rounded-xl border border-white/5 bg-white/5 py-3 px-4 text-xs text-white placeholder-gray-500 focus:border-red-500/40 focus:bg-white/10 outline-none transition-all"
+                            />
+                          </div>
+                          <button
+                            type="submit"
+                            disabled={actionLoading}
+                            className="w-full flex items-center justify-center gap-2 py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all cursor-pointer text-xs"
+                          >
+                            {actionLoading ? <FiLoader className="h-4 w-4 animate-spin" /> : <FiFolderPlus className="h-4 w-4" />}
+                            Save Genre
+                          </button>
+                        </form>
+                      </>
+                    )}
                   </div>
 
                   {/* Right listing */}
@@ -1102,13 +1198,44 @@ export default function AdminDashboard() {
                     ) : (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {genres.map(genre => {
-                          const movieCount = movies.filter(m => m.genres.some(g => g.id === genre.id)).length;
+                          const genreMovies = movies.filter(m => m.genres.some(g => g.id === genre.id));
+                          const movieCount = genreMovies.length;
                           return (
-                            <div key={genre.id} className="p-4 bg-white/5 border border-white/5 rounded-xl flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-bold text-white uppercase">{genre.name}</p>
-                                <p className="text-[10px] text-gray-400 mt-0.5">{movieCount} Titles Linked</p>
+                            <div key={genre.id} className="p-4 bg-white/5 border border-white/5 rounded-xl flex flex-col justify-between gap-3">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-bold text-white uppercase">{genre.name}</p>
+                                  <p className="text-[10px] text-gray-400 mt-0.5">{movieCount} Titles Linked</p>
+                                </div>
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => handleGenreEditClick(genre)}
+                                    className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-gray-300 hover:text-white transition-colors cursor-pointer"
+                                    title="Edit Name"
+                                  >
+                                    <FiEdit className="h-3.5 w-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleGenreDeleteClick(genre.id, genre.name)}
+                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 rounded-lg text-red-400 hover:text-red-300 transition-colors cursor-pointer"
+                                    title="Delete Genre"
+                                  >
+                                    <FiTrash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </div>
                               </div>
+                              {movieCount > 0 && (
+                                <div className="border-t border-white/5 pt-2">
+                                  <p className="text-[9px] font-bold text-gray-500 uppercase tracking-wider mb-1">Linked Titles:</p>
+                                  <div className="flex flex-wrap gap-1">
+                                    {genreMovies.map(movie => (
+                                      <span key={movie.id} className="px-1.5 py-0.5 bg-white/5 rounded text-[9px] text-gray-400">
+                                        {movie.title}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           );
                         })}

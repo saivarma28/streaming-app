@@ -19,6 +19,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 // Middleware settings
 app.use(express.json());
+app.use("/uploads", express.static("uploads"));
 
 // Enable CORS for VITE frontend app client requests
 app.use(

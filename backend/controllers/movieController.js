@@ -1,6 +1,8 @@
 import { prisma } from "../config/db.js";
 import { uploadToGCS } from "../services/googleCloudStorage.js";
 import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
+import fs from "fs";
+import path from "path";
 
 /**
  * Retrieves movies list.
@@ -195,34 +197,64 @@ export async function createMovie(req, res) {
       }
     });
 
-    // 2. Process Video File Upload to Google Cloud if provided
+    // 2. Process Video File Upload
     if (req.file) {
       try {
-        const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
-        const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
-        
-        const outputFolder = `movies/${movie.id}/transcoded/`;
-        const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
-        
-        // Create Transcoder job
-        const jobInfo = await createTranscodingJob(inputUri, outputUri);
-        
-        const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
-        
-        movie = await prisma.movie.update({
-          where: { id: movie.id },
-          data: {
-            sourceVideoPath: inputUri,
-            transcoderJobName: jobInfo.jobName,
-            transcodingStatus: "PROCESSING",
-            hlsUrl: hlsUrl
-          },
-          include: {
-            genres: true
+        const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
+
+        if (isGcpConfigured) {
+          const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
+          const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
+          
+          const outputFolder = `movies/${movie.id}/transcoded/`;
+          const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
+          
+          // Create Transcoder job
+          const jobInfo = await createTranscodingJob(inputUri, outputUri);
+          
+          const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
+          
+          movie = await prisma.movie.update({
+            where: { id: movie.id },
+            data: {
+              sourceVideoPath: inputUri,
+              transcoderJobName: jobInfo.jobName,
+              transcodingStatus: "PROCESSING",
+              hlsUrl: hlsUrl
+            },
+            include: {
+              genres: true
+            }
+          });
+        } else {
+          // Local fallback: save file to backend/uploads/movies
+          console.warn("WARNING: Google Cloud not configured. Using local file storage fallback.");
+          
+          const uploadDir = path.resolve("uploads/movies");
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
           }
-        });
+          
+          const filename = `movie_${movie.id}_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
+          const filepath = path.join(uploadDir, filename);
+          fs.writeFileSync(filepath, req.file.buffer);
+          
+          const localUrl = `http://localhost:5000/uploads/movies/${filename}`;
+          
+          movie = await prisma.movie.update({
+            where: { id: movie.id },
+            data: {
+              sourceVideoPath: filepath,
+              transcodingStatus: "READY",
+              hlsUrl: localUrl
+            },
+            include: {
+              genres: true
+            }
+          });
+        }
       } catch (uploadError) {
-        console.error("GCP Upload/Transcode process failed:", uploadError.message);
+        console.error("Upload/Transcode process failed:", uploadError.message);
         // Mark status as FAILED
         movie = await prisma.movie.update({
           where: { id: movie.id },
@@ -232,7 +264,7 @@ export async function createMovie(req, res) {
         
         return res.status(500).json({
           success: false,
-          message: `Video upload/transcoding setup failed: ${uploadError.message}`,
+          message: `Video upload failed: ${uploadError.message}`,
           movie
         });
       }
@@ -310,7 +342,7 @@ export async function updateMovie(req, res) {
     }
 
     let uploadResult = {};
-    // 1. Process Video File Upload to Google Cloud if replacing
+    // 1. Process Video File Upload
     if (req.file) {
       try {
         // Temporarily mark status as UPLOADING during the file write process
@@ -319,24 +351,48 @@ export async function updateMovie(req, res) {
           data: { transcodingStatus: "UPLOADING" }
         });
 
-        const destinationPath = `movies/${existingMovie.id}/source_${Date.now()}_${req.file.originalname}`;
-        const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
-        
-        const outputFolder = `movies/${existingMovie.id}/transcoded/`;
-        const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
-        
-        const jobInfo = await createTranscodingJob(inputUri, outputUri);
-        
-        const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
-        
-        uploadResult = {
-          sourceVideoPath: inputUri,
-          transcoderJobName: jobInfo.jobName,
-          transcodingStatus: "PROCESSING",
-          hlsUrl: hlsUrl
-        };
+        const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
+
+        if (isGcpConfigured) {
+          const destinationPath = `movies/${existingMovie.id}/source_${Date.now()}_${req.file.originalname}`;
+          const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
+          
+          const outputFolder = `movies/${existingMovie.id}/transcoded/`;
+          const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
+          
+          const jobInfo = await createTranscodingJob(inputUri, outputUri);
+          
+          const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
+          
+          uploadResult = {
+            sourceVideoPath: inputUri,
+            transcoderJobName: jobInfo.jobName,
+            transcodingStatus: "PROCESSING",
+            hlsUrl: hlsUrl
+          };
+        } else {
+          // Local fallback: save file to backend/uploads/movies
+          console.warn("WARNING: Google Cloud not configured. Using local file storage fallback.");
+          
+          const uploadDir = path.resolve("uploads/movies");
+          if (!fs.existsSync(uploadDir)) {
+            fs.mkdirSync(uploadDir, { recursive: true });
+          }
+          
+          const filename = `movie_${existingMovie.id}_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
+          const filepath = path.join(uploadDir, filename);
+          fs.writeFileSync(filepath, req.file.buffer);
+          
+          const localUrl = `http://localhost:5000/uploads/movies/${filename}`;
+          
+          uploadResult = {
+            sourceVideoPath: filepath,
+            transcodingStatus: "READY",
+            hlsUrl: localUrl
+          };
+        }
       } catch (uploadError) {
-        console.error("GCP Upload/Transcode process failed:", uploadError.message);
+        console.error("Upload/Transcode process failed:", uploadError.message);
         // Mark status as FAILED in DB
         await prisma.movie.update({
           where: { id: existingMovie.id },
@@ -344,7 +400,7 @@ export async function updateMovie(req, res) {
         });
         return res.status(500).json({
           success: false,
-          message: `Video upload/transcoding replacement failed: ${uploadError.message}`
+          message: `Video upload replacement failed: ${uploadError.message}`
         });
       }
     }

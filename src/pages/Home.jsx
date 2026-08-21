@@ -1,14 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiPlay, FiInfo, FiPlus, FiChevronRight } from "react-icons/fi";
+import { FiPlay, FiInfo, FiPlus, FiChevronRight, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
-import { getMovies, getGenres } from "../services/apiService";
+import { getMovies, getGenres, getWatchHistory } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 
 export default function Home() {
   const { currentUser } = useAuth();
   const [movies, setMovies] = useState([]);
   const [genres, setGenres] = useState([]);
+  const [watchHistory, setWatchHistory] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGenreId, setSelectedGenreId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -19,14 +22,19 @@ export default function Home() {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
         
-        // Fetch movies and genres in parallel
-        const [moviesData, genresData] = await Promise.all([
+        // Fetch movies, genres, and watch history in parallel
+        const [moviesData, genresData, historyData] = await Promise.all([
           getMovies(token),
-          getGenres(token)
+          getGenres(token),
+          getWatchHistory(token).catch((e) => {
+            console.warn("Failed to load watch history for homepage:", e.message);
+            return { history: [] };
+          })
         ]);
 
         setMovies(moviesData.movies || []);
         setGenres(genresData.genres || []);
+        setWatchHistory(historyData.history || []);
       } catch (err) {
         console.error("Failed to load catalog:", err);
         setError("Could not load catalog. Please check your connection.");
@@ -38,12 +46,28 @@ export default function Home() {
     loadCatalog();
   }, [currentUser]);
 
-  // Select a featured movie for the main hero banner (first premium or first published movie)
-  const featuredMovie = movies.find(m => m.isPremium) || movies[0];
+  // Filter movies based on search and genre selection
+  const filteredMovies = movies.filter(movie => {
+    const matchesSearch = searchQuery.trim() === "" ||
+      movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      movie.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (movie.language && movie.language.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // Group movies by genre
+    const matchesGenre = !selectedGenreId ||
+      movie.genres.some(g => g.id === selectedGenreId);
+
+    return matchesSearch && matchesGenre;
+  });
+
+  // Filter active continue watching items
+  const continueWatchingList = watchHistory.filter(item => !item.completed && item.movie);
+
+  // Select a featured movie for the main hero banner (first premium or first published movie from filtered list)
+  const featuredMovie = filteredMovies.find(m => m.isPremium) || filteredMovies[0];
+
+  // Group movies by genre (respecting search and filters)
   const getMoviesByGenre = (genreId) => {
-    return movies.filter(movie => 
+    return filteredMovies.filter(movie => 
       movie.genres.some(genre => genre.id === genreId)
     );
   };
@@ -117,41 +141,150 @@ export default function Home() {
         </div>
       )}
 
-      {/* Catalog Grid (Netflix-style Rows) */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-12 space-y-12">
-        {/* If no movies in database */}
-        {movies.length === 0 && (
+      {/* Search & Genre Filtering Controls */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
+        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white/5 border border-white/5 p-4 rounded-2xl backdrop-blur-md">
+          {/* Genre Category Badges */}
+          <div className="flex flex-wrap gap-2 justify-start items-center">
+            <button
+              onClick={() => setSelectedGenreId(null)}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                selectedGenreId === null
+                  ? "bg-[#e50914] text-white shadow-md"
+                  : "bg-white/5 hover:bg-white/10 text-gray-300"
+              }`}
+            >
+              All Genres
+            </button>
+            {genres.map(genre => (
+              <button
+                key={genre.id}
+                onClick={() => setSelectedGenreId(genre.id)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedGenreId === genre.id
+                    ? "bg-[#e50914] text-white shadow-md"
+                    : "bg-white/5 hover:bg-white/10 text-gray-300"
+                }`}
+              >
+                {genre.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Search Input Box */}
+          <div className="relative w-full md:w-80">
+            <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search titles, descriptions, languages..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs text-white placeholder-gray-400 outline-none focus:border-red-500/40 focus:bg-white/10 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Continue Watching Section */}
+      {continueWatchingList.length > 0 && !searchQuery && !selectedGenreId && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-10">
+          <div className="space-y-4 text-left">
+            <div className="flex items-center gap-3 border-l-4 border-amber-500 pl-3">
+              <h3 className="text-xl font-bold tracking-tight text-white uppercase">Continue Watching</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {continueWatchingList.map((item) => {
+                const progressPct = item.movie.duration 
+                  ? Math.min(Math.round((item.progress / (item.movie.duration * 60)) * 100), 100) 
+                  : 0;
+
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => navigate(`/watch/${item.movie.id}`, { state: { startPosition: item.progress } })}
+                    className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                  >
+                    {item.movie.thumbnailUrl ? (
+                      <img
+                        src={item.movie.thumbnailUrl}
+                        alt={item.movie.title}
+                        className="absolute inset-0 h-full w-full object-cover opacity-70 group-hover:opacity-90 transition-all duration-300"
+                      />
+                    ) : (
+                      <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-amber-950/40 opacity-70 group-hover:opacity-90 transition-all duration-300 flex items-center justify-center">
+                        <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{item.movie.title}</span>
+                      </div>
+                    )}
+                    
+                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+
+                    {/* Play Hover Indicator */}
+                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/40 z-10">
+                      <div className="p-3 bg-amber-500 rounded-full text-black">
+                        <FiPlay className="h-5 w-5 fill-current" />
+                      </div>
+                    </div>
+
+                    {/* Details and Progress Bar */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-15">
+                      <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300">
+                        {item.movie.title}
+                      </h4>
+                      <p className="text-[10px] text-gray-400 mt-0.5">Resume at {Math.floor(item.progress / 60)}m</p>
+                      
+                      {/* Progress bar */}
+                      <div className="w-full bg-white/10 rounded-full h-1 mt-3 overflow-hidden">
+                        <div className="bg-amber-500 h-full" style={{ width: `${progressPct}%` }}></div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Catalog Grid */}
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-12 space-y-12 pb-24">
+        {movies.length === 0 ? (
           <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
             <h3 className="text-xl font-bold text-white mb-2">No Movies Found</h3>
             <p className="text-gray-400 font-light text-sm">
               Our library is currently empty. Ask the administrator to add premium titles to start streaming.
             </p>
           </div>
-        )}
+        ) : (searchQuery || selectedGenreId) ? (
+          // Flat Grid View for Searched/Filtered Results
+          <div className="space-y-6 text-left">
+            <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
+              <h3 className="text-xl font-bold tracking-tight text-white uppercase animate-pulse">Search & Filter Results ({filteredMovies.length})</h3>
+            </div>
 
-        {/* Display Movies by Genre */}
-        {genres.map((genre) => {
-          const genreMovies = getMoviesByGenre(genre.id);
-          if (genreMovies.length === 0) return null; // Hide empty genres
-
-          return (
-            <div key={genre.id} className="space-y-4">
-              <div className="flex items-center justify-between border-l-4 border-red-500 pl-3">
-                <h3 className="text-xl font-bold tracking-tight text-white">{genre.name}</h3>
-                <span className="text-xs font-semibold text-gray-500 hover:text-red-400 cursor-pointer inline-flex items-center gap-0.5 transition-colors">
-                  View All <FiChevronRight />
-                </span>
+            {filteredMovies.length === 0 ? (
+              <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
+                <h3 className="text-lg font-bold text-white mb-1">No Matching Titles</h3>
+                <p className="text-gray-400 font-light text-xs">
+                  We couldn't find any titles matching your search term or genre choice. Try adjusting your filter.
+                </p>
               </div>
-
-              {/* Grid of cards */}
+            ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {genreMovies.map((movie) => (
+                {filteredMovies.map((movie) => (
                   <div
                     key={movie.id}
                     onClick={() => navigate(`/movie/${movie.id}`)}
                     className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                   >
-                    {/* Thumbnail Image */}
                     {movie.thumbnailUrl ? (
                       <img
                         src={movie.thumbnailUrl}
@@ -166,7 +299,6 @@ export default function Home() {
 
                     <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
 
-                    {/* Gradient Overlay & Metadata */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
                       <div className="flex items-center justify-between mb-1.5">
                         {movie.isPremium && (
@@ -184,54 +316,112 @@ export default function Home() {
                   </div>
                 ))}
               </div>
-            </div>
-          );
-        })}
+            )}
+          </div>
+        ) : (
+          // Default Rows View
+          <div className="space-y-12 text-left">
+            {genres.map((genre) => {
+              const genreMovies = getMoviesByGenre(genre.id);
+              if (genreMovies.length === 0) return null;
 
-        {/* Catch-all row for movies without genres */}
-        {movies.length > 0 && movies.filter(m => m.genres.length === 0).length > 0 && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between border-l-4 border-red-500 pl-3">
-              <h3 className="text-xl font-bold tracking-tight text-white">Uncategorized Titles</h3>
-            </div>
+              return (
+                <div key={genre.id} className="space-y-4">
+                  <div className="flex items-center justify-between border-l-4 border-red-500 pl-3">
+                    <h3 className="text-xl font-bold tracking-tight text-white">{genre.name}</h3>
+                    <span className="text-xs font-semibold text-gray-500 hover:text-red-400 cursor-pointer inline-flex items-center gap-0.5 transition-colors">
+                      View All <FiChevronRight />
+                    </span>
+                  </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {movies.filter(m => m.genres.length === 0).map((movie) => (
-                <div
-                  key={movie.id}
-                  onClick={() => navigate(`/movie/${movie.id}`)}
-                  className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
-                >
-                  {movie.thumbnailUrl ? (
-                    <img
-                      src={movie.thumbnailUrl}
-                      alt={movie.title}
-                      className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                    />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
-                    </div>
-                  )}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {genreMovies.map((movie) => (
+                      <div
+                        key={movie.id}
+                        onClick={() => navigate(`/movie/${movie.id}`)}
+                        className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                      >
+                        {movie.thumbnailUrl ? (
+                          <img
+                            src={movie.thumbnailUrl}
+                            alt={movie.title}
+                            className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
+                          </div>
+                        )}
 
-                  <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
+                        <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
-                    <div className="flex items-center justify-between mb-1.5">
-                      {movie.isPremium && (
-                        <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                          Premium
-                        </span>
-                      )}
-                      <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
-                    </div>
-                    <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                      {movie.title}
-                    </h4>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                          <div className="flex items-center justify-between mb-1.5">
+                            {movie.isPremium && (
+                              <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                Premium
+                              </span>
+                            )}
+                            <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
+                          </div>
+                          <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
+                            {movie.title}
+                          </h4>
+                          <p className="text-[10px] text-gray-400 mt-1 truncate">{movie.genres.map(g => g.name).join(" • ")}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+
+            {/* Uncategorized Titles Row */}
+            {movies.filter(m => m.genres.length === 0).length > 0 && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between border-l-4 border-red-500 pl-3">
+                  <h3 className="text-xl font-bold tracking-tight text-white">Uncategorized Titles</h3>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {movies.filter(m => m.genres.length === 0).map((movie) => (
+                    <div
+                      key={movie.id}
+                      onClick={() => navigate(`/movie/${movie.id}`)}
+                      className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                    >
+                      {movie.thumbnailUrl ? (
+                        <img
+                          src={movie.thumbnailUrl}
+                          alt={movie.title}
+                          className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                        <div className="flex items-center justify-between mb-1.5">
+                          {movie.isPremium && (
+                            <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              Premium
+                            </span>
+                          )}
+                          <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
+                        </div>
+                        <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
+                          {movie.title}
+                        </h4>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

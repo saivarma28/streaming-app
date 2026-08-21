@@ -1,5 +1,5 @@
 import express from "express";
-import { getGenres, createGenre } from "../controllers/genreController.js";
+import { getGenres, createGenre, updateGenre, deleteGenre } from "../controllers/genreController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 
@@ -10,5 +10,11 @@ router.get("/", authMiddleware, getGenres);
 
 // Create a new genre (Admin only)
 router.post("/", authMiddleware, adminMiddleware, createGenre);
+
+// Update a genre name (Admin only)
+router.put("/:id", authMiddleware, adminMiddleware, updateGenre);
+
+// Delete a genre (Admin only)
+router.delete("/:id", authMiddleware, adminMiddleware, deleteGenre);
 
 export default router;

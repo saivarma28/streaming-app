@@ -328,6 +328,56 @@ export async function createGenre(token, name) {
 }
 
 /**
+ * Update an existing genre's name. (Admin only)
+ * PUT /api/genres/:id
+ */
+export async function updateGenre(token, id, name) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/genres/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ name })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to update genre.");
+    }
+    return data;
+  } catch (error) {
+    console.error("updateGenre API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Delete a genre. (Admin only)
+ * DELETE /api/genres/:id
+ */
+export async function deleteGenre(token, id) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/genres/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to delete genre.");
+    }
+    return data;
+  } catch (error) {
+    console.error("deleteGenre API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
  * Fetch watch history list for logged-in user.
  * GET /api/watch-history
  */
