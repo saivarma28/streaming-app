@@ -7,6 +7,9 @@ import { prisma } from "./config/db.js";
 import "./config/firebaseAdmin.js"; // Side-effect import to initialize Firebase Admin SDK
 import authRoutes from "./routes/authRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
+import movieRoutes from "./routes/movieRoutes.js";
+import genreRoutes from "./routes/genreRoutes.js";
+import watchHistoryRoutes from "./routes/watchHistoryRoutes.js";
 
 dotenv.config();
 
@@ -49,6 +52,15 @@ app.use("/api/auth", authRoutes);
 
 // 3. User synchronization and profile management routes (Phase 2)
 app.use("/api/users", userRoutes);
+
+// 4. Movie catalog routes
+app.use("/api/movies", movieRoutes);
+
+// 5. Genre catalog routes
+app.use("/api/genres", genreRoutes);
+
+// 6. Watch history routes
+app.use("/api/watch-history", watchHistoryRoutes);
 
 // Start server listening
 app.listen(PORT, () => {

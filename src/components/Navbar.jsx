@@ -2,12 +2,33 @@ import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { getUserMe } from "../services/apiService";
 
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [role, setRole] = useState("user");
   const { currentUser, logout } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    async function fetchUserRole() {
+      if (currentUser) {
+        try {
+          const token = await currentUser.getIdToken();
+          const response = await getUserMe(token);
+          if (response.success && response.user) {
+            setRole(response.user.role);
+          }
+        } catch (err) {
+          console.error("Failed to load user role in Navbar:", err);
+        }
+      } else {
+        setRole("user");
+      }
+    }
+    fetchUserRole();
+  }, [currentUser]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -37,6 +58,10 @@ export default function Navbar() {
     { name: "New & Popular", path: "/new-popular" },
     { name: "My List", path: "/my-list" }
   ];
+
+  if (role === "admin") {
+    navLinks.push({ name: "Admin Dashboard", path: "/admin" });
+  }
 
   // Helper to extract initials
   const getUserInitials = () => {

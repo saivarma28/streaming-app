@@ -11,6 +11,9 @@ import ForgotPasswordPhone from "../pages/ForgotPasswordPhone";
 import ForgotPasswordPhoneVerify from "../pages/ForgotPasswordPhoneVerify";
 import ForgotPasswordPhoneReset from "../pages/ForgotPasswordPhoneReset";
 import Profile from "../pages/Profile";
+import MovieDetails from "../pages/MovieDetails";
+import VideoPlayerPage from "../pages/VideoPlayerPage";
+import AdminDashboard from "../pages/AdminDashboard";
 import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
 
@@ -46,6 +49,30 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/movie/:id"
+        element={
+          <ProtectedRoute>
+            <MovieDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/watch/:id"
+        element={
+          <ProtectedRoute>
+            <VideoPlayerPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <ProtectedRoute>
+            <AdminDashboard />
           </ProtectedRoute>
         }
       />

@@ -142,3 +142,265 @@ export async function updateUserMe(token, profileData) {
   }
 }
 
+/**
+ * Fetch movies list.
+ * GET /api/movies
+ */
+export async function getMovies(token, genreId = null, adminView = false) {
+  try {
+    let url = `${BACKEND_URL}/api/movies?adminView=${adminView}`;
+    if (genreId) {
+      url += `&genreId=${genreId}`;
+    }
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to fetch movies.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getMovies API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch a single movie by ID.
+ * GET /api/movies/:id
+ */
+export async function getMovieById(token, id) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/movies/${id}`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to fetch movie details.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getMovieById API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Create a new movie. (Admin only)
+ * POST /api/movies
+ * 
+ * @param {string} token 
+ * @param {FormData} formData 
+ */
+export async function createMovie(token, formData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/movies`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+        // Do NOT set Content-Type header when sending FormData! The browser sets it automatically with the boundary.
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to create movie.");
+    }
+    return data;
+  } catch (error) {
+    console.error("createMovie API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update an existing movie. (Admin only)
+ * PUT /api/movies/:id
+ * 
+ * @param {string} token 
+ * @param {number|string} id 
+ * @param {FormData} formData 
+ */
+export async function updateMovie(token, id, formData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/movies/${id}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to update movie.");
+    }
+    return data;
+  } catch (error) {
+    console.error("updateMovie API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Delete a movie. (Admin only)
+ * DELETE /api/movies/:id
+ */
+export async function deleteMovie(token, id) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/movies/${id}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to delete movie.");
+    }
+    return data;
+  } catch (error) {
+    console.error("deleteMovie API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all genres.
+ * GET /api/genres
+ */
+export async function getGenres(token) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/genres`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to fetch genres.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getGenres API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Create a new genre. (Admin only)
+ * POST /api/genres
+ */
+export async function createGenre(token, name) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/genres`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ name })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to create genre.");
+    }
+    return data;
+  } catch (error) {
+    console.error("createGenre API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Fetch watch history list for logged-in user.
+ * GET /api/watch-history
+ */
+export async function getWatchHistory(token) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/watch-history`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to fetch watch history.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getWatchHistory API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Save or update watch progress.
+ * POST /api/watch-history
+ */
+export async function saveWatchHistory(token, movieId, progress, completed = false) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/watch-history`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ movieId, progress, completed })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to save watch progress.");
+    }
+    return data;
+  } catch (error) {
+    console.error("saveWatchHistory API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
+ * Update watch progress for a movie.
+ * PUT /api/watch-history/:movieId
+ */
+export async function updateWatchHistory(token, movieId, progress, completed = false) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/watch-history/${movieId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ progress, completed })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to update watch progress.");
+    }
+    return data;
+  } catch (error) {
+    console.error("updateWatchHistory API Error:", error.message);
+    throw error;
+  }
+}
+
+
