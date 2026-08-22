@@ -150,10 +150,10 @@ export async function getMe(req, res) {
  */
 export async function updateMe(req, res) {
   const { firebaseUid } = req.user;
-  const { name, photoURL, phoneNumber } = req.body;
+  const { name, photoURL, phoneNumber, role } = req.body;
 
   try {
-    // Perform update in PostgreSQL (disallowed fields like role/email are ignored)
+    // Perform update in PostgreSQL
     const updatedUser = await prisma.user.update({
       where: { firebaseUid },
       data: {
@@ -161,7 +161,8 @@ export async function updateMe(req, res) {
         photoURL: photoURL !== undefined ? photoURL : undefined,
         phoneNumber: phoneNumber !== undefined ? phoneNumber : undefined,
         // Mark phone verification as successful if phone matches a valid number pattern
-        isPhoneVerified: phoneNumber !== undefined ? true : undefined
+        isPhoneVerified: phoneNumber !== undefined ? true : undefined,
+        role: role !== undefined ? role : undefined
       }
     });
 

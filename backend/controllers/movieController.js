@@ -1,6 +1,7 @@
 import { prisma } from "../config/db.js";
 import { uploadToGCS } from "../services/googleCloudStorage.js";
 import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
+import { uploadToR2 } from "../services/cloudflareR2.js";
 import fs from "fs";
 import path from "path";
 
@@ -200,9 +201,25 @@ export async function createMovie(req, res) {
     // 2. Process Video File Upload
     if (req.file) {
       try {
+        const isR2Configured = process.env.R2_ENDPOINT ? true : false;
         const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
 
-        if (isGcpConfigured) {
+        if (isR2Configured) {
+          const destinationPath = `movies/${movie.id}/video_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
+          const publicUrl = await uploadToR2(req.file.buffer, destinationPath, req.file.mimetype);
+          
+          movie = await prisma.movie.update({
+            where: { id: movie.id },
+            data: {
+              sourceVideoPath: publicUrl,
+              transcodingStatus: "READY",
+              hlsUrl: publicUrl
+            },
+            include: {
+              genres: true
+            }
+          });
+        } else if (isGcpConfigured) {
           const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
           const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
           
@@ -228,7 +245,7 @@ export async function createMovie(req, res) {
           });
         } else {
           // Local fallback: save file to backend/uploads/movies
-          console.warn("WARNING: Google Cloud not configured. Using local file storage fallback.");
+          console.warn("WARNING: Google Cloud & Cloudflare R2 not configured. Using local file storage fallback.");
           
           const uploadDir = path.resolve("uploads/movies");
           if (!fs.existsSync(uploadDir)) {
@@ -351,9 +368,19 @@ export async function updateMovie(req, res) {
           data: { transcodingStatus: "UPLOADING" }
         });
 
+        const isR2Configured = process.env.R2_ENDPOINT ? true : false;
         const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
 
-        if (isGcpConfigured) {
+        if (isR2Configured) {
+          const destinationPath = `movies/${existingMovie.id}/video_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
+          const publicUrl = await uploadToR2(req.file.buffer, destinationPath, req.file.mimetype);
+          
+          uploadResult = {
+            sourceVideoPath: publicUrl,
+            transcodingStatus: "READY",
+            hlsUrl: publicUrl
+          };
+        } else if (isGcpConfigured) {
           const destinationPath = `movies/${existingMovie.id}/source_${Date.now()}_${req.file.originalname}`;
           const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
           
@@ -372,7 +399,7 @@ export async function updateMovie(req, res) {
           };
         } else {
           // Local fallback: save file to backend/uploads/movies
-          console.warn("WARNING: Google Cloud not configured. Using local file storage fallback.");
+          console.warn("WARNING: Google Cloud & Cloudflare R2 not configured. Using local file storage fallback.");
           
           const uploadDir = path.resolve("uploads/movies");
           if (!fs.existsSync(uploadDir)) {
