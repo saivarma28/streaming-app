@@ -1,7 +1,7 @@
-import { prisma } from "../config/db.js";
+import { getDb, getNextSequenceValue } from "../config/mongodb.js";
 
 /**
- * Middleware to verify that the user has the "admin" role in PostgreSQL.
+ * Middleware to verify that the user has the "admin" role in MongoDB.
  * Must be registered AFTER authMiddleware (which establishes req.user).
  */
 export async function adminMiddleware(req, res, next) {
@@ -13,47 +13,59 @@ export async function adminMiddleware(req, res, next) {
   }
 
   try {
-    // Look up the user record in PostgreSQL to confirm their role
-    let user = await prisma.user.findUnique({
-      where: { firebaseUid: req.user.firebaseUid }
+    const db = getDb();
+    const userCollection = db.collection("users");
+
+    // Look up the user record in MongoDB to confirm their role
+    let user = await userCollection.findOne({
+      firebaseUid: req.user.firebaseUid
     });
 
     if (!user) {
       // Check if user already exists by email first (avoid unique constraint violation)
-      user = await prisma.user.findUnique({
-        where: { email: req.user.email }
-      });
+      user = await userCollection.findOne({ email: req.user.email });
 
       if (user) {
         // If found by email, update their firebaseUid and sync details
         const shouldBeAdmin = req.user.email === "saivarma9333@gmail.com";
-        user = await prisma.user.update({
-          where: { email: req.user.email },
-          data: {
-            firebaseUid: req.user.firebaseUid,
-            name: req.user.name || user.name,
-            photoURL: req.user.photoURL || user.photoURL,
-            isEmailVerified: req.user.emailVerified || user.isEmailVerified,
-            role: shouldBeAdmin ? "admin" : user.role
+        await userCollection.updateOne(
+          { email: req.user.email },
+          {
+            $set: {
+              firebaseUid: req.user.firebaseUid,
+              name: req.user.name || user.name,
+              photoURL: req.user.photoURL || user.photoURL,
+              isEmailVerified: req.user.emailVerified || user.isEmailVerified,
+              role: shouldBeAdmin ? "admin" : user.role,
+              updatedAt: new Date()
+            }
           }
-        });
-        console.log(`Admin Middleware Auto-sync: Associated existing PostgreSQL user by email (${user.email}) to new uid ${user.firebaseUid}`);
+        );
+        user = await userCollection.findOne({ email: req.user.email });
+        console.log(`Admin Middleware Auto-sync: Associated existing MongoDB user by email (${user.email}) to new uid ${user.firebaseUid}`);
       } else {
-        // Auto-create/sync the user if they exist in Firebase Auth but missing from PostgreSQL
-        const userCount = await prisma.user.count();
+        // Auto-create/sync the user if they exist in Firebase Auth but missing from MongoDB
+        const userCount = await userCollection.countDocuments();
         const isAdmin = userCount === 0 || req.user.email === "saivarma9333@gmail.com";
+        const newId = await getNextSequenceValue("users");
 
-        user = await prisma.user.create({
-          data: {
-            firebaseUid: req.user.firebaseUid,
-            email: req.user.email,
-            name: req.user.name || "User",
-            photoURL: req.user.photoURL,
-            isEmailVerified: req.user.emailVerified,
-            role: isAdmin ? "admin" : "user"
-          }
-        });
-        console.log(`Admin Middleware Auto-sync: Created new PostgreSQL user (${user.role}) for uid ${user.firebaseUid}`);
+        const newUserDoc = {
+          id: newId,
+          firebaseUid: req.user.firebaseUid,
+          email: req.user.email,
+          name: req.user.name || "User",
+          photoURL: req.user.photoURL,
+          isEmailVerified: req.user.emailVerified,
+          isPhoneVerified: false,
+          phoneNumber: null,
+          role: isAdmin ? "admin" : "user",
+          createdAt: new Date(),
+          updatedAt: new Date()
+        };
+
+        await userCollection.insertOne(newUserDoc);
+        user = newUserDoc;
+        console.log(`Admin Middleware Auto-sync: Created new MongoDB user (${user.role}) for uid ${user.firebaseUid}`);
       }
     }
 

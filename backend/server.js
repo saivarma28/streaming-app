@@ -1,7 +1,7 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
-import { prisma } from "./config/db.js";
+import { connectToDatabase, getDb } from "./config/mongodb.js";
 
 // Import configurations and route definitions
 import "./config/firebaseAdmin.js"; // Side-effect import to initialize Firebase Admin SDK
@@ -29,12 +29,12 @@ app.use(
   })
 );
 
-// 1. Health check (GET /api/health) - Verifies running server and PostgreSQL connection
+// 1. Health check (GET /api/health) - Verifies running server and MongoDB connection
 app.get("/api/health", async (req, res) => {
   let dbStatus = "Disconnected";
   try {
-    // Run a fast raw test query to verify PostgreSQL connection availability
-    await prisma.$queryRaw`SELECT 1`;
+    const db = getDb();
+    await db.command({ ping: 1 });
     dbStatus = "Connected";
   } catch (error) {
     console.error("Database connection failure in health check:", error.message);
@@ -43,7 +43,7 @@ app.get("/api/health", async (req, res) => {
   const isConnected = dbStatus === "Connected";
   return res.status(isConnected ? 200 : 500).json({
     success: isConnected,
-    message: isConnected ? "Backend is running" : "Database connection failed. Please ensure PostgreSQL is active.",
+    message: isConnected ? "Backend is running" : "Database connection failed. Please ensure MongoDB is active.",
     database: dbStatus
   });
 });
@@ -63,7 +63,14 @@ app.use("/api/genres", genreRoutes);
 // 6. Watch history routes
 app.use("/api/watch-history", watchHistoryRoutes);
 
-// Start server listening
-app.listen(PORT, () => {
-  console.log(`Backend server running on port ${PORT}`);
-});
+// Connect to MongoDB first, then start server listening
+connectToDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Backend server running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("FATAL ERROR: Could not start backend server due to MongoDB connection failure:", err.message);
+    process.exit(1);
+  });

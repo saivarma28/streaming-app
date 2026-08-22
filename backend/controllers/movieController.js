@@ -1,4 +1,4 @@
-import { prisma } from "../config/db.js";
+import { getDb, getNextSequenceValue } from "../config/mongodb.js";
 import { uploadToGCS } from "../services/googleCloudStorage.js";
 import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
 import { uploadToR2 } from "../services/cloudflareR2.js";
@@ -16,13 +16,13 @@ export async function getMovies(req, res) {
   const { adminView, genreId } = req.query;
 
   try {
+    const db = getDb();
+    const movieCollection = db.collection("movies");
     let whereClause = { isPublished: true };
 
     // If adminView is requested, verify user role first
     if (adminView === "true" && req.user?.firebaseUid) {
-      const user = await prisma.user.findUnique({
-        where: { firebaseUid: req.user.firebaseUid }
-      });
+      const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
       if (user && user.role === "admin") {
         whereClause = {}; // Admins can view all records (both published and unpublished)
       }
@@ -30,20 +30,18 @@ export async function getMovies(req, res) {
 
     // Apply optional genre filter
     if (genreId) {
-      whereClause.genres = {
-        some: {
-          id: parseInt(genreId)
-        }
-      };
+      whereClause.genreIds = parseInt(genreId);
     }
 
-    const movies = await prisma.movie.findMany({
-      where: whereClause,
-      include: {
-        genres: true
-      },
-      orderBy: { createdAt: "desc" }
-    });
+    const movies = await movieCollection.find(whereClause).sort({ createdAt: -1 }).toArray();
+
+    // Populate genres relation
+    for (let movie of movies) {
+      const genres = await db.collection("genres")
+        .find({ id: { $in: movie.genreIds || [] } })
+        .toArray();
+      movie.genres = genres;
+    }
 
     return res.status(200).json({
       success: true,
@@ -66,12 +64,10 @@ export async function getMovieById(req, res) {
   const { id } = req.params;
 
   try {
-    const movie = await prisma.movie.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        genres: true
-      }
-    });
+    const db = getDb();
+    const movieCollection = db.collection("movies");
+
+    const movie = await movieCollection.findOne({ id: parseInt(id) });
 
     if (!movie) {
       return res.status(404).json({
@@ -84,9 +80,7 @@ export async function getMovieById(req, res) {
     if (!movie.isPublished) {
       let isAuthorized = false;
       if (req.user?.firebaseUid) {
-        const user = await prisma.user.findUnique({
-          where: { firebaseUid: req.user.firebaseUid }
-        });
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
         if (user && user.role === "admin") {
           isAuthorized = true;
         }
@@ -98,6 +92,12 @@ export async function getMovieById(req, res) {
         });
       }
     }
+
+    // Populate genres relation
+    const genres = await db.collection("genres")
+      .find({ id: { $in: movie.genreIds || [] } })
+      .toArray();
+    movie.genres = genres;
 
     return res.status(200).json({
       success: true,
@@ -114,7 +114,7 @@ export async function getMovieById(req, res) {
 
 /**
  * Creates a new movie. (Admin only)
- * Optionally handles uploading a video file directly to Google Cloud Storage.
+ * Optionally handles uploading a video file directly to Cloudflare R2 / GCS.
  * 
  * POST /api/movies
  */
@@ -165,7 +165,6 @@ export async function createMovie(req, res) {
         parsedGenreIds = genreIds;
       }
     } catch (e) {
-      // Fallback to split if simple comma-separated string
       parsedGenreIds = String(genreIds)
         .split(",")
         .map((id) => parseInt(id.trim()))
@@ -174,29 +173,36 @@ export async function createMovie(req, res) {
   }
 
   try {
-    // 1. Insert Movie Record into PostgreSQL via Prisma first
-    let movie = await prisma.movie.create({
-      data: {
-        title,
-        description,
-        thumbnailUrl,
-        backdropUrl,
-        trailerUrl,
-        duration: parsedDuration,
-        releaseYear: parsedReleaseYear,
-        maturityRating: maturityRating || null,
-        language: language || "English",
-        isPremium: parsedIsPremium,
-        isPublished: parsedIsPublished,
-        transcodingStatus: req.file ? "UPLOADING" : "READY",
-        genres: {
-          connect: parsedGenreIds.map((id) => ({ id: parseInt(id) }))
-        }
-      },
-      include: {
-        genres: true
-      }
-    });
+    const db = getDb();
+    const movieCollection = db.collection("movies");
+    const newId = await getNextSequenceValue("movies");
+
+    // 1. Insert Movie Record into MongoDB
+    const newMovieDoc = {
+      id: newId,
+      title,
+      description,
+      thumbnailUrl: thumbnailUrl || null,
+      backdropUrl: backdropUrl || null,
+      trailerUrl: trailerUrl || null,
+      videoUrl: null,
+      hlsUrl: null,
+      sourceVideoPath: null,
+      transcoderJobName: null,
+      duration: parsedDuration,
+      releaseYear: parsedReleaseYear,
+      maturityRating: maturityRating || null,
+      language: language || "English",
+      isPremium: parsedIsPremium,
+      isPublished: parsedIsPublished,
+      transcodingStatus: req.file ? "UPLOADING" : "READY",
+      genreIds: parsedGenreIds,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+
+    await movieCollection.insertOne(newMovieDoc);
+    let movie = newMovieDoc;
 
     // 2. Process Video File Upload
     if (req.file) {
@@ -208,17 +214,17 @@ export async function createMovie(req, res) {
           const destinationPath = `movies/${movie.id}/video_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
           const publicUrl = await uploadToR2(req.file.buffer, destinationPath, req.file.mimetype);
           
-          movie = await prisma.movie.update({
-            where: { id: movie.id },
-            data: {
-              sourceVideoPath: publicUrl,
-              transcodingStatus: "READY",
-              hlsUrl: publicUrl
-            },
-            include: {
-              genres: true
+          await movieCollection.updateOne(
+            { id: movie.id },
+            {
+              $set: {
+                sourceVideoPath: publicUrl,
+                transcodingStatus: "READY",
+                hlsUrl: publicUrl
+              }
             }
-          });
+          );
+          movie = await movieCollection.findOne({ id: movie.id });
         } else if (isGcpConfigured) {
           const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
           const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
@@ -231,18 +237,18 @@ export async function createMovie(req, res) {
           
           const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
           
-          movie = await prisma.movie.update({
-            where: { id: movie.id },
-            data: {
-              sourceVideoPath: inputUri,
-              transcoderJobName: jobInfo.jobName,
-              transcodingStatus: "PROCESSING",
-              hlsUrl: hlsUrl
-            },
-            include: {
-              genres: true
+          await movieCollection.updateOne(
+            { id: movie.id },
+            {
+              $set: {
+                sourceVideoPath: inputUri,
+                transcoderJobName: jobInfo.jobName,
+                transcodingStatus: "PROCESSING",
+                hlsUrl: hlsUrl
+              }
             }
-          });
+          );
+          movie = await movieCollection.findOne({ id: movie.id });
         } else {
           // Local fallback: save file to backend/uploads/movies
           console.warn("WARNING: Google Cloud & Cloudflare R2 not configured. Using local file storage fallback.");
@@ -258,26 +264,26 @@ export async function createMovie(req, res) {
           
           const localUrl = `http://localhost:5000/uploads/movies/${filename}`;
           
-          movie = await prisma.movie.update({
-            where: { id: movie.id },
-            data: {
-              sourceVideoPath: filepath,
-              transcodingStatus: "READY",
-              hlsUrl: localUrl
-            },
-            include: {
-              genres: true
+          await movieCollection.updateOne(
+            { id: movie.id },
+            {
+              $set: {
+                sourceVideoPath: filepath,
+                transcodingStatus: "READY",
+                hlsUrl: localUrl
+              }
             }
-          });
+          );
+          movie = await movieCollection.findOne({ id: movie.id });
         }
       } catch (uploadError) {
         console.error("Upload/Transcode process failed:", uploadError.message);
         // Mark status as FAILED
-        movie = await prisma.movie.update({
-          where: { id: movie.id },
-          data: { transcodingStatus: "FAILED" },
-          include: { genres: true }
-        });
+        await movieCollection.updateOne(
+          { id: movie.id },
+          { $set: { transcodingStatus: "FAILED" } }
+        );
+        movie = await movieCollection.findOne({ id: movie.id });
         
         return res.status(500).json({
           success: false,
@@ -286,6 +292,12 @@ export async function createMovie(req, res) {
         });
       }
     }
+
+    // Populate genres relation for response
+    const genres = await db.collection("genres")
+      .find({ id: { $in: movie.genreIds || [] } })
+      .toArray();
+    movie.genres = genres;
 
     return res.status(201).json({
       success: true,
@@ -302,7 +314,7 @@ export async function createMovie(req, res) {
 
 /**
  * Updates an existing movie record. (Admin only)
- * Optionally handles uploading/replacing a video file on Google Cloud Storage.
+ * Optionally handles uploading/replacing a video file.
  * 
  * PUT /api/movies/:id
  */
@@ -324,9 +336,9 @@ export async function updateMovie(req, res) {
   } = req.body;
 
   try {
-    const existingMovie = await prisma.movie.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const db = getDb();
+    const movieCollection = db.collection("movies");
+    const existingMovie = await movieCollection.findOne({ id: parseInt(id) });
 
     if (!existingMovie) {
       return res.status(404).json({
@@ -353,8 +365,8 @@ export async function updateMovie(req, res) {
       } catch (e) {
         parsedGenreIds = String(genreIds)
           .split(",")
-          .map((id) => parseInt(id.trim()))
-          .filter((id) => !isNaN(id));
+          .map((gid) => parseInt(gid.trim()))
+          .filter((gid) => !isNaN(gid));
       }
     }
 
@@ -363,10 +375,10 @@ export async function updateMovie(req, res) {
     if (req.file) {
       try {
         // Temporarily mark status as UPLOADING during the file write process
-        await prisma.movie.update({
-          where: { id: existingMovie.id },
-          data: { transcodingStatus: "UPLOADING" }
-        });
+        await movieCollection.updateOne(
+          { id: existingMovie.id },
+          { $set: { transcodingStatus: "UPLOADING" } }
+        );
 
         const isR2Configured = process.env.R2_ENDPOINT ? true : false;
         const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
@@ -421,10 +433,10 @@ export async function updateMovie(req, res) {
       } catch (uploadError) {
         console.error("Upload/Transcode process failed:", uploadError.message);
         // Mark status as FAILED in DB
-        await prisma.movie.update({
-          where: { id: existingMovie.id },
-          data: { transcodingStatus: "FAILED" }
-        });
+        await movieCollection.updateOne(
+          { id: existingMovie.id },
+          { $set: { transcodingStatus: "FAILED" } }
+        );
         return res.status(500).json({
           success: false,
           message: `Video upload replacement failed: ${uploadError.message}`
@@ -433,29 +445,34 @@ export async function updateMovie(req, res) {
     }
 
     // 2. Perform database update
-    const updatedMovie = await prisma.movie.update({
-      where: { id: parseInt(id) },
-      data: {
-        title: title !== undefined ? title : undefined,
-        description: description !== undefined ? description : undefined,
-        thumbnailUrl: thumbnailUrl !== undefined ? thumbnailUrl : undefined,
-        backdropUrl: backdropUrl !== undefined ? backdropUrl : undefined,
-        trailerUrl: trailerUrl !== undefined ? trailerUrl : undefined,
-        duration: parsedDuration,
-        releaseYear: parsedReleaseYear,
-        maturityRating: maturityRating !== undefined ? maturityRating : undefined,
-        language: language !== undefined ? language : undefined,
-        isPremium: parsedIsPremium,
-        isPublished: parsedIsPublished,
-        genres: parsedGenreIds !== undefined ? {
-          set: parsedGenreIds.map((gid) => ({ id: parseInt(gid) }))
-        } : undefined,
-        ...uploadResult
-      },
-      include: {
-        genres: true
-      }
-    });
+    const updateFields = {};
+    if (title !== undefined) updateFields.title = title;
+    if (description !== undefined) updateFields.description = description;
+    if (thumbnailUrl !== undefined) updateFields.thumbnailUrl = thumbnailUrl;
+    if (backdropUrl !== undefined) updateFields.backdropUrl = backdropUrl;
+    if (trailerUrl !== undefined) updateFields.trailerUrl = trailerUrl;
+    if (parsedDuration !== undefined) updateFields.duration = parsedDuration;
+    if (parsedReleaseYear !== undefined) updateFields.releaseYear = parsedReleaseYear;
+    if (maturityRating !== undefined) updateFields.maturityRating = maturityRating;
+    if (language !== undefined) updateFields.language = language;
+    if (parsedIsPremium !== undefined) updateFields.isPremium = parsedIsPremium;
+    if (parsedIsPublished !== undefined) updateFields.isPublished = parsedIsPublished;
+    if (parsedGenreIds !== undefined) updateFields.genreIds = parsedGenreIds;
+    Object.assign(updateFields, uploadResult);
+    updateFields.updatedAt = new Date();
+
+    await movieCollection.updateOne(
+      { id: parseInt(id) },
+      { $set: updateFields }
+    );
+
+    const updatedMovie = await movieCollection.findOne({ id: parseInt(id) });
+
+    // Populate genres relation for response
+    const genres = await db.collection("genres")
+      .find({ id: { $in: updatedMovie.genreIds || [] } })
+      .toArray();
+    updatedMovie.genres = genres;
 
     return res.status(200).json({
       success: true,
@@ -478,9 +495,9 @@ export async function deleteMovie(req, res) {
   const { id } = req.params;
 
   try {
-    const existingMovie = await prisma.movie.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const db = getDb();
+    const movieCollection = db.collection("movies");
+    const existingMovie = await movieCollection.findOne({ id: parseInt(id) });
 
     if (!existingMovie) {
       return res.status(404).json({
@@ -489,9 +506,10 @@ export async function deleteMovie(req, res) {
       });
     }
 
-    await prisma.movie.delete({
-      where: { id: parseInt(id) }
-    });
+    await movieCollection.deleteOne({ id: parseInt(id) });
+
+    // Remove references in watch histories as well
+    await db.collection("watch_histories").deleteMany({ movieId: parseInt(id) });
 
     return res.status(200).json({
       success: true,
@@ -514,9 +532,9 @@ export async function getTranscodingStatus(req, res) {
   const { id } = req.params;
 
   try {
-    const movie = await prisma.movie.findUnique({
-      where: { id: parseInt(id) }
-    });
+    const db = getDb();
+    const movieCollection = db.collection("movies");
+    const movie = await movieCollection.findOne({ id: parseInt(id) });
 
     if (!movie) {
       return res.status(404).json({
@@ -538,10 +556,10 @@ export async function getTranscodingStatus(req, res) {
         }
 
         if (newStatus !== movie.transcodingStatus) {
-          await prisma.movie.update({
-            where: { id: parseInt(id) },
-            data: { transcodingStatus: newStatus }
-          });
+          await movieCollection.updateOne(
+            { id: parseInt(id) },
+            { $set: { transcodingStatus: newStatus } }
+          );
           movie.transcodingStatus = newStatus;
         }
       } catch (err) {
@@ -561,4 +579,5 @@ export async function getTranscodingStatus(req, res) {
     });
   }
 }
+
 

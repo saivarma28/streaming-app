@@ -1,4 +1,4 @@
-import { prisma } from "../config/db.js";
+import { getDb, getNextSequenceValue } from "../config/mongodb.js";
 
 /**
  * Retrieves all genres from the database.
@@ -6,9 +6,11 @@ import { prisma } from "../config/db.js";
  */
 export async function getGenres(req, res) {
   try {
-    const genres = await prisma.genre.findMany({
-      orderBy: { name: "asc" }
-    });
+    const db = getDb();
+    const genres = await db.collection("genres")
+      .find({})
+      .sort({ name: 1 })
+      .toArray();
 
     return res.status(200).json({
       success: true,
@@ -40,10 +42,11 @@ export async function createGenre(req, res) {
   const normalizedName = name.trim();
 
   try {
+    const db = getDb();
+    const genreCollection = db.collection("genres");
+
     // Check if the genre already exists
-    const existingGenre = await prisma.genre.findUnique({
-      where: { name: normalizedName }
-    });
+    const existingGenre = await genreCollection.findOne({ name: normalizedName });
 
     if (existingGenre) {
       return res.status(400).json({
@@ -52,13 +55,18 @@ export async function createGenre(req, res) {
       });
     }
 
-    const genre = await prisma.genre.create({
-      data: { name: normalizedName }
-    });
+    const newId = await getNextSequenceValue("genres");
+    const newGenreDoc = {
+      id: newId,
+      name: normalizedName,
+      createdAt: new Date()
+    };
+
+    await genreCollection.insertOne(newGenreDoc);
 
     return res.status(201).json({
       success: true,
-      genre
+      genre: newGenreDoc
     });
   } catch (error) {
     console.error("createGenre Controller Error:", error.message);
@@ -93,14 +101,14 @@ export async function updateGenre(req, res) {
   }
 
   try {
+    const db = getDb();
+    const genreCollection = db.collection("genres");
     const normalizedName = name.trim();
 
     // Check if another genre exists with this name
-    const existingGenre = await prisma.genre.findFirst({
-      where: {
-        name: normalizedName,
-        NOT: { id: parsedId }
-      }
+    const existingGenre = await genreCollection.findOne({
+      name: normalizedName,
+      id: { $ne: parsedId }
     });
 
     if (existingGenre) {
@@ -110,10 +118,12 @@ export async function updateGenre(req, res) {
       });
     }
 
-    const updatedGenre = await prisma.genre.update({
-      where: { id: parsedId },
-      data: { name: normalizedName }
-    });
+    await genreCollection.updateOne(
+      { id: parsedId },
+      { $set: { name: normalizedName } }
+    );
+
+    const updatedGenre = await genreCollection.findOne({ id: parsedId });
 
     return res.status(200).json({
       success: true,
@@ -144,9 +154,25 @@ export async function deleteGenre(req, res) {
   }
 
   try {
-    const deletedGenre = await prisma.genre.delete({
-      where: { id: parsedId }
-    });
+    const db = getDb();
+    const genreCollection = db.collection("genres");
+
+    const deletedGenre = await genreCollection.findOne({ id: parsedId });
+
+    if (!deletedGenre) {
+      return res.status(404).json({
+        success: false,
+        message: "Genre not found."
+      });
+    }
+
+    await genreCollection.deleteOne({ id: parsedId });
+
+    // Remove this genre association from any movies
+    await db.collection("movies").updateMany(
+      { genreIds: parsedId },
+      { $pull: { genreIds: parsedId } }
+    );
 
     return res.status(200).json({
       success: true,

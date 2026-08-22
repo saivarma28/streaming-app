@@ -1,4 +1,4 @@
-import { prisma } from "../config/db.js";
+import { getDb, getNextSequenceValue } from "../config/mongodb.js";
 
 /**
  * Retrieves the authenticated user's watch history.
@@ -6,9 +6,8 @@ import { prisma } from "../config/db.js";
  */
 export async function getWatchHistory(req, res) {
   try {
-    const user = await prisma.user.findUnique({
-      where: { firebaseUid: req.user.firebaseUid }
-    });
+    const db = getDb();
+    const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
 
     if (!user) {
       return res.status(404).json({
@@ -17,17 +16,22 @@ export async function getWatchHistory(req, res) {
       });
     }
 
-    const history = await prisma.watchHistory.findMany({
-      where: { userId: user.id },
-      include: {
-        movie: {
-          include: {
-            genres: true
-          }
-        }
-      },
-      orderBy: { lastWatchedAt: "desc" }
-    });
+    const history = await db.collection("watch_histories")
+      .find({ userId: user.id })
+      .sort({ lastWatchedAt: -1 })
+      .toArray();
+
+    // Populate nested movie and genre relations
+    for (let record of history) {
+      const movie = await db.collection("movies").findOne({ id: record.movieId });
+      if (movie) {
+        const genres = await db.collection("genres")
+          .find({ id: { $in: movie.genreIds || [] } })
+          .toArray();
+        movie.genres = genres;
+        record.movie = movie;
+      }
+    }
 
     return res.status(200).json({
       success: true,
@@ -68,9 +72,8 @@ export async function saveWatchHistory(req, res) {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { firebaseUid: req.user.firebaseUid }
-    });
+    const db = getDb();
+    const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
 
     if (!user) {
       return res.status(404).json({
@@ -80,9 +83,7 @@ export async function saveWatchHistory(req, res) {
     }
 
     // Verify the movie exists
-    const movie = await prisma.movie.findUnique({
-      where: { id: parsedMovieId }
-    });
+    const movie = await db.collection("movies").findOne({ id: parsedMovieId });
 
     if (!movie) {
       return res.status(404).json({
@@ -91,26 +92,40 @@ export async function saveWatchHistory(req, res) {
       });
     }
 
-    // Upsert the watch history record
-    const history = await prisma.watchHistory.upsert({
-      where: {
-        userId_movieId: {
-          userId: user.id,
-          movieId: parsedMovieId
+    const watchHistoryCollection = db.collection("watch_histories");
+    let historyRecord = await watchHistoryCollection.findOne({
+      userId: user.id,
+      movieId: parsedMovieId
+    });
+
+    let history;
+    if (historyRecord) {
+      // Update
+      await watchHistoryCollection.updateOne(
+        { id: historyRecord.id },
+        {
+          $set: {
+            progress: parsedProgress,
+            completed: isCompleted,
+            lastWatchedAt: new Date()
+          }
         }
-      },
-      update: {
-        progress: parsedProgress,
-        completed: isCompleted,
-        lastWatchedAt: new Date()
-      },
-      create: {
+      );
+      history = await watchHistoryCollection.findOne({ id: historyRecord.id });
+    } else {
+      // Create
+      const newId = await getNextSequenceValue("watch_histories");
+      const newDoc = {
+        id: newId,
         userId: user.id,
         movieId: parsedMovieId,
         progress: parsedProgress,
-        completed: isCompleted
-      }
-    });
+        completed: isCompleted,
+        lastWatchedAt: new Date()
+      };
+      await watchHistoryCollection.insertOne(newDoc);
+      history = newDoc;
+    }
 
     return res.status(200).json({
       success: true,
@@ -152,9 +167,8 @@ export async function updateWatchHistory(req, res) {
   }
 
   try {
-    const user = await prisma.user.findUnique({
-      where: { firebaseUid: req.user.firebaseUid }
-    });
+    const db = getDb();
+    const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
 
     if (!user) {
       return res.status(404).json({
@@ -163,43 +177,39 @@ export async function updateWatchHistory(req, res) {
       });
     }
 
-    // Check if the history record exists
-    const existingHistory = await prisma.watchHistory.findUnique({
-      where: {
-        userId_movieId: {
-          userId: user.id,
-          movieId: parsedMovieId
-        }
-      }
+    const watchHistoryCollection = db.collection("watch_histories");
+    let historyRecord = await watchHistoryCollection.findOne({
+      userId: user.id,
+      movieId: parsedMovieId
     });
 
     let history;
-
-    if (!existingHistory) {
-      // If it doesn't exist yet, we create it
-      history = await prisma.watchHistory.create({
-        data: {
-          userId: user.id,
-          movieId: parsedMovieId,
-          progress: parsedProgress,
-          completed: isCompleted
-        }
-      });
+    if (!historyRecord) {
+      // Create
+      const newId = await getNextSequenceValue("watch_histories");
+      const newDoc = {
+        id: newId,
+        userId: user.id,
+        movieId: parsedMovieId,
+        progress: parsedProgress,
+        completed: isCompleted,
+        lastWatchedAt: new Date()
+      };
+      await watchHistoryCollection.insertOne(newDoc);
+      history = newDoc;
     } else {
-      // Update existing record
-      history = await prisma.watchHistory.update({
-        where: {
-          userId_movieId: {
-            userId: user.id,
-            movieId: parsedMovieId
+      // Update
+      await watchHistoryCollection.updateOne(
+        { id: historyRecord.id },
+        {
+          $set: {
+            progress: parsedProgress,
+            completed: isCompleted,
+            lastWatchedAt: new Date()
           }
-        },
-        data: {
-          progress: parsedProgress,
-          completed: isCompleted,
-          lastWatchedAt: new Date()
         }
-      });
+      );
+      history = await watchHistoryCollection.findOne({ id: historyRecord.id });
     }
 
     return res.status(200).json({
@@ -221,17 +231,26 @@ export async function updateWatchHistory(req, res) {
  */
 export async function getAllWatchHistories(req, res) {
   try {
-    const history = await prisma.watchHistory.findMany({
-      include: {
-        user: true,
-        movie: {
-          include: {
-            genres: true
-          }
-        }
-      },
-      orderBy: { lastWatchedAt: "desc" }
-    });
+    const db = getDb();
+    const history = await db.collection("watch_histories")
+      .find({})
+      .sort({ lastWatchedAt: -1 })
+      .toArray();
+
+    // Populate user and movie (with genres) relations
+    for (let record of history) {
+      const user = await db.collection("users").findOne({ id: record.userId });
+      record.user = user;
+
+      const movie = await db.collection("movies").findOne({ id: record.movieId });
+      if (movie) {
+        const genres = await db.collection("genres")
+          .find({ id: { $in: movie.genreIds || [] } })
+          .toArray();
+        movie.genres = genres;
+        record.movie = movie;
+      }
+    }
 
     return res.status(200).json({
       success: true,
