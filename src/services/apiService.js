@@ -59,7 +59,7 @@ export async function verifyEmailOtp(email, otp) {
 }
 
 /**
- * Synchronize Firebase user details with PostgreSQL.
+ * Synchronize Firebase user details with MongoDB.
  * Hits POST /api/users/sync
  * 
  * @param {string} token - Firebase ID token
@@ -86,7 +86,7 @@ export async function syncUser(token) {
 }
 
 /**
- * Retrieve current user profile details from PostgreSQL.
+ * Retrieve current user profile details from MongoDB.
  * Hits GET /api/users/me
  * 
  * @param {string} token - Firebase ID token
@@ -113,7 +113,7 @@ export async function getUserMe(token) {
 }
 
 /**
- * Update current user profile details in PostgreSQL.
+ * Update current user profile details in MongoDB.
  * Hits PUT /api/users/me
  * 
  * @param {string} token - Firebase ID token

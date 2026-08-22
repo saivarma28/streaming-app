@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { 
   FiPlus, FiEdit, FiTrash2, FiVideo, FiUpload, FiFolderPlus, 
   FiToggleLeft, FiToggleRight, FiLoader, FiAlertCircle, 
   FiGrid, FiUsers, FiClock, FiSettings, FiLogOut, FiMenu, FiX, 
-  FiSearch, FiBell, FiEye, FiTv, FiInfo, FiActivity, FiCheckCircle
+  FiSearch, FiBell, FiEye, FiTv, FiInfo, FiActivity, FiCheckCircle,
+  FiHome
 } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -463,6 +465,14 @@ export default function AdminDashboard() {
               <FiSettings className="h-5 w-5 shrink-0" />
               {sidebarOpen && <span>Global Settings</span>}
             </button>
+
+            <Link 
+              to="/"
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all border border-transparent text-gray-400 hover:bg-white/5 hover:text-white"
+            >
+              <FiHome className="h-5 w-5 shrink-0" />
+              {sidebarOpen && <span>Exit to StreamApp</span>}
+            </Link>
           </nav>
         </div>
 

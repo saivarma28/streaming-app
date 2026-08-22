@@ -8,7 +8,7 @@ const router = express.Router();
 // Retrieve all user profiles (Admin only)
 router.get("/", authMiddleware, adminMiddleware, getAllUsers);
 
-// Synchronize Firebase UID and profile details with PostgreSQL User table
+// Synchronize Firebase UID and profile details with MongoDB User table
 router.post("/sync", authMiddleware, syncUser);
 
 // Retrieve local database profile details for the authenticated user

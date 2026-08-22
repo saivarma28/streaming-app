@@ -15,6 +15,7 @@ import {
   linkWithCredential,
   PhoneAuthProvider
 } from "firebase/auth";
+import { getUserMe } from "../services/apiService";
 
 const AuthContext = createContext();
 
@@ -24,8 +25,30 @@ export function useAuth() {
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [dbUser, setDbUser] = useState(null);
+  const [role, setRole] = useState("user");
   const [loading, setLoading] = useState(true);
   const [authTimeout, setAuthTimeout] = useState(false);
+
+  async function fetchDbProfile(firebaseUser) {
+    if (firebaseUser) {
+      try {
+        const token = await firebaseUser.getIdToken();
+        const res = await getUserMe(token);
+        if (res.success && res.user) {
+          setDbUser(res.user);
+          setRole(res.user.role);
+          return res.user;
+        }
+      } catch (err) {
+        console.warn("Failed to fetch MongoDB user profile inside AuthContext:", err.message);
+      }
+    } else {
+      setDbUser(null);
+      setRole("user");
+    }
+    return null;
+  }
 
   // Email & Password Registration with Display Name mapping
   async function register(email, password, fullName) {
@@ -85,8 +108,14 @@ export function AuthProvider({ children }) {
     }, 4000);
 
     // Setup listener for firebase auth state change
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user);
+      if (user) {
+        await fetchDbProfile(user);
+      } else {
+        setDbUser(null);
+        setRole("user");
+      }
       setLoading(false);
       setAuthTimeout(false);
       clearTimeout(timer);
@@ -105,6 +134,8 @@ export function AuthProvider({ children }) {
 
   const value = {
     currentUser,
+    dbUser,
+    role,
     loading,
     authTimeout,
     register,
@@ -114,7 +145,8 @@ export function AuthProvider({ children }) {
     googleLogin,
     signInWithPhone,
     reloadUser,
-    linkPhone
+    linkPhone,
+    fetchDbProfile
   };
 
   return (

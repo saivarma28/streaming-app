@@ -8,8 +8,8 @@ import { useAuth } from "../context/AuthContext";
  * Enforces verification pipeline:
  * Signed In -> Email Verified -> Phone Verified -> Protected App
  */
-export default function ProtectedRoute({ children }) {
-  const { currentUser, loading, authTimeout } = useAuth();
+export default function ProtectedRoute({ children, adminOnly = false }) {
+  const { currentUser, role, loading, authTimeout } = useAuth();
 
   if (authTimeout) {
     return (
@@ -47,6 +47,11 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. All checks passed: render child elements
+  // 2. Check if page is admin only
+  if (adminOnly && role !== "admin") {
+    return <Navigate to="/" replace />;
+  }
+
+  // 3. All checks passed: render child elements
   return children;
 }

@@ -163,7 +163,7 @@ export async function getMe(req, res) {
  */
 export async function updateMe(req, res) {
   const { firebaseUid } = req.user;
-  const { name, photoURL, phoneNumber, role } = req.body;
+  const { name, photoURL, phoneNumber } = req.body;
 
   try {
     const db = getDb();
@@ -176,7 +176,6 @@ export async function updateMe(req, res) {
       updateFields.phoneNumber = phoneNumber;
       updateFields.isPhoneVerified = true;
     }
-    if (role !== undefined) updateFields.role = role;
     updateFields.updatedAt = new Date();
 
     await userCollection.updateOne(

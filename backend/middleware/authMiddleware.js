@@ -23,6 +23,9 @@ export async function authMiddleware(req, res, next) {
       // Verify the Firebase ID Token using Firebase Admin SDK
       decodedToken = await admin.auth().verifyIdToken(token);
     } else {
+      if (process.env.NODE_ENV === "production") {
+        throw new Error("Firebase Admin SDK is not initialized. Token verification failed in production.");
+      }
       console.warn("WARNING: Firebase Admin SDK not initialized. Decoding token payload without verification (development bypass).");
       const parts = token.split(".");
       if (parts.length !== 3) {

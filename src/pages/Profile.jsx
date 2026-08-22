@@ -1,37 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FiLogOut, FiUser, FiMail, FiAlertCircle, FiShield, FiCheckCircle } from "react-icons/fi";
-import { getUserMe, updateUserMe } from "../services/apiService";
 
 export default function Profile() {
-  const { currentUser, logout } = useAuth();
-  const [role, setRole] = useState("user");
-  const [roleLoading, setRoleLoading] = useState(true);
+  const { currentUser, role, logout } = useAuth();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-
-  useEffect(() => {
-    async function loadRole() {
-      if (currentUser) {
-        try {
-          const token = await currentUser.getIdToken();
-          const response = await getUserMe(token);
-          if (response.success && response.user) {
-            setRole(response.user.role);
-          }
-        } catch (err) {
-          console.error("Failed to load role in Profile:", err);
-          setError("Failed to fetch user role status.");
-        } finally {
-          setRoleLoading(false);
-        }
-      }
-    }
-    loadRole();
-  }, [currentUser]);
 
   const handleLogout = async () => {
     try {
@@ -46,29 +23,7 @@ export default function Profile() {
     }
   };
 
-  const handleToggleRole = async () => {
-    setError("");
-    setSuccess("");
-    const newRole = role === "admin" ? "user" : "admin";
-    try {
-      setRoleLoading(true);
-      const token = await currentUser.getIdToken();
-      const response = await updateUserMe(token, { role: newRole });
-      if (response.success && response.user) {
-        setRole(response.user.role);
-        setSuccess(`Role updated to ${newRole.toUpperCase()} successfully!`);
-        
-        // Refresh the page after a brief delay so the user sees the success state and routes update
-        setTimeout(() => {
-          window.location.reload();
-        }, 1200);
-      }
-    } catch (err) {
-      console.error(err);
-      setError("Failed to update role. Please try again.");
-      setRoleLoading(false);
-    }
-  };
+
 
   // Helper to extract user initials if avatar is not available
   const getUserInitials = () => {
@@ -144,48 +99,24 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* Developer Console / Admin Toggle Section */}
-        <div className="mb-8 rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-5 text-left">
-          <div className="flex items-center gap-2 mb-3">
-            <FiShield className="h-4.5 w-4.5 text-[#e50914]" />
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Developer Options</span>
-          </div>
-          <p className="text-xs text-gray-500 font-light mb-4 leading-relaxed">
-            Quickly toggle database privileges to test normal user capabilities vs. the video creator and admin catalog panels.
-          </p>
-
-          <div className="flex items-center justify-between bg-black/20 rounded-xl p-3 border border-white/5">
-            <span className="text-xs font-semibold text-gray-300">
-              Role Privilege: <span className={`capitalize ml-1 font-bold ${role === "admin" ? "text-red-500" : "text-gray-400"}`}>{role}</span>
-            </span>
-            <button
-              onClick={handleToggleRole}
-              disabled={roleLoading}
-              className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all duration-300 cursor-pointer ${
-                role === "admin"
-                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                  : "bg-gradient-to-r from-[#e50914] to-red-600 text-white hover:from-red-600 hover:to-red-700 shadow-[0_2px_10px_rgba(229,9,20,0.3)]"
-              }`}
-            >
-              {roleLoading ? (
-                <div className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></div>
-              ) : role === "admin" ? (
-                "Make User"
-              ) : (
-                "Make Admin"
-              )}
-            </button>
-          </div>
-
-          {role === "admin" && (
+        {/* Administrative Mode Link (Only visible if database role is admin) */}
+        {role === "admin" && (
+          <div className="mb-8 rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-5 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              <FiShield className="h-4.5 w-4.5 text-[#e50914]" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Administrative Mode</span>
+            </div>
+            <p className="text-xs text-gray-500 font-light mb-4 leading-relaxed">
+              Your account has administrator privileges. You can access the backend management dashboard below.
+            </p>
             <Link
               to="/admin"
-              className="mt-3 block text-center py-2 px-3 rounded-lg border border-red-500/25 bg-red-500/5 hover:bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider transition-colors duration-300"
+              className="block text-center py-2 px-3 rounded-lg border border-red-500/25 bg-red-500/5 hover:bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider transition-colors duration-300"
             >
               Go to Admin Dashboard
             </Link>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Action Button */}
         <button
