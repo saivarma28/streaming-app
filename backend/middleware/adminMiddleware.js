@@ -19,21 +19,42 @@ export async function adminMiddleware(req, res, next) {
     });
 
     if (!user) {
-      // Auto-create/sync the user if they exist in Firebase Auth but missing from PostgreSQL
-      const userCount = await prisma.user.count();
-      const isAdmin = userCount === 0 || req.user.email === "saivarma9333@gmail.com";
-
-      user = await prisma.user.create({
-        data: {
-          firebaseUid: req.user.firebaseUid,
-          email: req.user.email,
-          name: req.user.name || "User",
-          photoURL: req.user.photoURL,
-          isEmailVerified: req.user.emailVerified,
-          role: isAdmin ? "admin" : "user"
-        }
+      // Check if user already exists by email first (avoid unique constraint violation)
+      user = await prisma.user.findUnique({
+        where: { email: req.user.email }
       });
-      console.log(`Admin Middleware Auto-sync: Created new PostgreSQL user (${user.role}) for uid ${user.firebaseUid}`);
+
+      if (user) {
+        // If found by email, update their firebaseUid and sync details
+        const shouldBeAdmin = req.user.email === "saivarma9333@gmail.com";
+        user = await prisma.user.update({
+          where: { email: req.user.email },
+          data: {
+            firebaseUid: req.user.firebaseUid,
+            name: req.user.name || user.name,
+            photoURL: req.user.photoURL || user.photoURL,
+            isEmailVerified: req.user.emailVerified || user.isEmailVerified,
+            role: shouldBeAdmin ? "admin" : user.role
+          }
+        });
+        console.log(`Admin Middleware Auto-sync: Associated existing PostgreSQL user by email (${user.email}) to new uid ${user.firebaseUid}`);
+      } else {
+        // Auto-create/sync the user if they exist in Firebase Auth but missing from PostgreSQL
+        const userCount = await prisma.user.count();
+        const isAdmin = userCount === 0 || req.user.email === "saivarma9333@gmail.com";
+
+        user = await prisma.user.create({
+          data: {
+            firebaseUid: req.user.firebaseUid,
+            email: req.user.email,
+            name: req.user.name || "User",
+            photoURL: req.user.photoURL,
+            isEmailVerified: req.user.emailVerified,
+            role: isAdmin ? "admin" : "user"
+          }
+        });
+        console.log(`Admin Middleware Auto-sync: Created new PostgreSQL user (${user.role}) for uid ${user.firebaseUid}`);
+      }
     }
 
     if (user.role !== "admin") {

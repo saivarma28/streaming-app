@@ -24,22 +24,43 @@ export async function syncUser(req, res) {
     });
 
     if (!user) {
-      // Promote to admin if they are the first user in PostgreSQL or their email is saivarma9333@gmail.com
-      const userCount = await prisma.user.count();
-      const isAdmin = userCount === 0 || email === "saivarma9333@gmail.com";
-
-      // 2. Create a new user record (role is strictly defaulted to 'user' unless promoted)
-      user = await prisma.user.create({
-        data: {
-          firebaseUid,
-          email,
-          name: name || "User",
-          photoURL,
-          isEmailVerified: emailVerified,
-          role: isAdmin ? "admin" : "user"
-        }
+      // Check if user already exists by email first (e.g. from a previous login provider/reset state)
+      user = await prisma.user.findUnique({
+        where: { email }
       });
-      console.log(`Database sync: Created new PostgreSQL user (${user.role}) for uid ${firebaseUid}`);
+
+      if (user) {
+        // If found by email, update their firebaseUid and sync details
+        const shouldBeAdmin = email === "saivarma9333@gmail.com";
+        user = await prisma.user.update({
+          where: { email },
+          data: {
+            firebaseUid,
+            name: name || user.name,
+            photoURL: photoURL || user.photoURL,
+            isEmailVerified: emailVerified || user.isEmailVerified,
+            role: shouldBeAdmin ? "admin" : user.role
+          }
+        });
+        console.log(`Database sync: Associated existing PostgreSQL user by email (${user.email}) to new uid ${firebaseUid}`);
+      } else {
+        // Promote to admin if they are the first user in PostgreSQL or their email is saivarma9333@gmail.com
+        const userCount = await prisma.user.count();
+        const isAdmin = userCount === 0 || email === "saivarma9333@gmail.com";
+
+        // 2. Create a new user record (role is strictly defaulted to 'user' unless promoted)
+        user = await prisma.user.create({
+          data: {
+            firebaseUid,
+            email,
+            name: name || "User",
+            photoURL,
+            isEmailVerified: emailVerified,
+            role: isAdmin ? "admin" : "user"
+          }
+        });
+        console.log(`Database sync: Created new PostgreSQL user (${user.role}) for uid ${firebaseUid}`);
+      }
     } else {
       // Update existing user details, and ensure saivarma9333@gmail.com gets upgraded to admin
       const shouldBeAdmin = email === "saivarma9333@gmail.com";

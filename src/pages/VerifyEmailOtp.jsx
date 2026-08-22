@@ -65,11 +65,13 @@ export default function VerifyEmailOtp() {
       return setError("Please enter a valid 6-digit OTP code.");
     }
 
+    let otpVerified = false;
     try {
       setLoading(true);
       
       // 1. Verify OTP with Backend API
       await verifyEmailOtp(tempUser.email, otp);
+      otpVerified = true;
 
       let token = null;
 
@@ -97,6 +99,8 @@ export default function VerifyEmailOtp() {
       console.error(err);
       if (err.message && err.message.toLowerCase().includes("expired")) {
         setError("OTP expired. Please request a new OTP.");
+      } else if (otpVerified) {
+        setError(err.message || "OTP verified, but database profile synchronization failed.");
       } else {
         setError("Invalid OTP. Please try again.");
       }
