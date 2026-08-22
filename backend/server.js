@@ -21,10 +21,22 @@ const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 
-// Enable CORS for VITE frontend app client requests
+// Enable CORS for VITE frontend app client requests (local dev + deployed Vercel)
+const allowedOrigins = [
+  FRONTEND_URL,
+  "http://localhost:5173",
+  "https://streaming-app-ten-opal.vercel.app"
+];
+
 app.use(
   cors({
-    origin: FRONTEND_URL,
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error(`Origin ${origin} not allowed by CORS`));
+      }
+    },
     credentials: true
   })
 );
