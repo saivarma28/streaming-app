@@ -77,7 +77,11 @@ export function AuthProvider({ children }) {
 
   // Password reset helper (Forgot Password)
   function resetPassword(email) {
-    return sendPasswordResetEmail(auth, email);
+    const actionCodeSettings = {
+      url: `${window.location.origin}/reset-password`,
+      handleCodeInApp: true,
+    };
+    return sendPasswordResetEmail(auth, email, actionCodeSettings);
   }
 
   function logout() {

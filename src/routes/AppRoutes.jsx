@@ -10,6 +10,7 @@ import ForgotPasswordEmail from "../pages/ForgotPasswordEmail";
 import ForgotPasswordPhone from "../pages/ForgotPasswordPhone";
 import ForgotPasswordPhoneVerify from "../pages/ForgotPasswordPhoneVerify";
 import ForgotPasswordPhoneReset from "../pages/ForgotPasswordPhoneReset";
+import ResetPassword from "../pages/ResetPassword";
 import Profile from "../pages/Profile";
 import MovieDetails from "../pages/MovieDetails";
 import VideoPlayerPage from "../pages/VideoPlayerPage";
@@ -137,6 +138,14 @@ export default function AppRoutes() {
         element={
           <PublicRoute>
             <ForgotPasswordPhoneReset />
+          </PublicRoute>
+        }
+      />
+      <Route
+        path="/reset-password"
+        element={
+          <PublicRoute>
+            <ResetPassword />
           </PublicRoute>
         }
       />
