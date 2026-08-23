@@ -125,6 +125,8 @@ export async function getMe(req, res) {
     const db = getDb();
     const user = await db.collection("users").findOne({ firebaseUid });
 
+    console.log("getMe Controller - Querying for UID:", firebaseUid, "Result Found:", !!user);
+
     if (!user) {
       return res.status(404).json({
         success: false,

@@ -9,4 +9,7 @@ node_modules
 *key.json
 service-account.json
 credentials.json
+*adminsdk*.json
+streaming-app-5e116-firebase-adminsdk-*.json
+
 

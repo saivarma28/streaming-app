@@ -52,6 +52,8 @@ export async function authMiddleware(req, res, next) {
       emailVerified: decodedToken.email_verified || false
     };
 
+    console.log("Auth Middleware - UID:", req.user.firebaseUid, "Email:", req.user.email);
+
     next();
   } catch (error) {
     console.error("Auth Middleware Token Verification Error:", error.message);

@@ -27,7 +27,7 @@ export default function Login() {
   const confirmationResultRef = useRef(null);
   const recaptchaVerifierRef = useRef(null);
 
-  const { login, googleLogin, signInWithPhone } = useAuth();
+  const { login, googleLogin, signInWithPhone, fetchDbProfile } = useAuth();
   const navigate = useNavigate();
 
   // Dynamic helper: Detect if the input is an email (contains letters or @) or phone (digits only)
@@ -86,6 +86,7 @@ export default function Login() {
         const userCredential = await login(identifier, password);
         const token = await userCredential.user.getIdToken();
         await syncUser(token);
+        await fetchDbProfile(userCredential.user);
         navigate("/");
       } catch (err) {
         console.error(err);
@@ -143,6 +144,7 @@ export default function Login() {
       const userCredential = await confirmationResultRef.current.confirm(otpCode);
       const token = await userCredential.user.getIdToken();
       await syncUser(token);
+      await fetchDbProfile(userCredential.user);
       navigate("/");
     } catch (err) {
       console.error(err);
@@ -159,6 +161,7 @@ export default function Login() {
       const userCredential = await googleLogin();
       const token = await userCredential.user.getIdToken();
       await syncUser(token);
+      await fetchDbProfile(userCredential.user);
       navigate("/");
     } catch (err) {
       console.error(err);

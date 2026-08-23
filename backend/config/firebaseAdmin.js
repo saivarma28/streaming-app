@@ -1,4 +1,5 @@
-import admin from "firebase-admin";
+import { initializeApp, cert, getApps } from "firebase-admin";
+import { getAuth } from "firebase-admin/auth";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
@@ -46,8 +47,8 @@ if (!serviceAccount) {
   );
 } else {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount)
+    initializeApp({
+      credential: cert(serviceAccount)
     });
     console.log("Firebase Admin SDK initialized successfully");
   } catch (error) {
@@ -55,4 +56,13 @@ if (!serviceAccount) {
   }
 }
 
-export default admin;
+const firebaseAdmin = {
+  get apps() {
+    return getApps();
+  },
+  auth() {
+    return getAuth();
+  }
+};
+
+export default firebaseAdmin;

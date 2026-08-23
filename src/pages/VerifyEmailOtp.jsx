@@ -5,7 +5,7 @@ import { verifyEmailOtp, sendEmailOtp, syncUser } from "../services/apiService";
 import { FiMail, FiAlertCircle, FiCheckCircle, FiRefreshCw, FiLogOut } from "react-icons/fi";
 
 export default function VerifyEmailOtp() {
-  const { currentUser, register, logout } = useAuth();
+  const { currentUser, register, logout, fetchDbProfile } = useAuth();
   const [otp, setOtp] = useState("");
   const [tempUser, setTempUser] = useState(null);
   const [otpSent, setOtpSent] = useState(false);
@@ -74,13 +74,14 @@ export default function VerifyEmailOtp() {
       otpVerified = true;
 
       let token = null;
+      let firebaseUser = currentUser;
 
       // 2. If we are in registration mode (have tempUser.password cached), create Firebase account now
       const regData = sessionStorage.getItem("temp_reg_user");
       if (regData) {
         const parsedReg = JSON.parse(regData);
-        const user = await register(parsedReg.email, parsedReg.password, parsedReg.fullName);
-        token = await user.getIdToken();
+        firebaseUser = await register(parsedReg.email, parsedReg.password, parsedReg.fullName);
+        token = await firebaseUser.getIdToken();
         sessionStorage.removeItem("temp_reg_user");
       } else if (currentUser) {
         token = await currentUser.getIdToken();
@@ -88,6 +89,7 @@ export default function VerifyEmailOtp() {
 
       if (token) {
         await syncUser(token);
+        await fetchDbProfile(firebaseUser);
       }
 
       // 3. Mark email verification step as successful

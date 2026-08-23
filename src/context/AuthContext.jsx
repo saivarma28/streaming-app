@@ -56,7 +56,7 @@ export function AuthProvider({ children }) {
     await updateProfile(userCredential.user, { displayName: fullName });
     await sendEmailVerification(userCredential.user);
     // Update local state copy to immediately reflect the displayName in the UI
-    setCurrentUser({ ...userCredential.user, displayName: fullName });
+    setCurrentUser(userCredential.user);
     return userCredential.user;
   }
 

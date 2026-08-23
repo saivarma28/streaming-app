@@ -7,7 +7,7 @@ import { FiPhone, FiLock, FiAlertCircle, FiCheckCircle, FiLogOut, FiArrowLeft } 
 import { syncUser } from "../services/apiService";
 
 export default function PhoneVerification() {
-  const { currentUser, signInWithPhone, linkPhone, logout } = useAuth();
+  const { currentUser, signInWithPhone, linkPhone, logout, fetchDbProfile } = useAuth();
   const [step, setStep] = useState(1); // 1 = Enter Phone, 2 = Enter SMS OTP
 
   // Inputs
@@ -191,6 +191,7 @@ export default function PhoneVerification() {
 
       if (token) {
         await syncUser(token);
+        await fetchDbProfile(user);
       }
 
       // Success! Clear session storage flags and redirect to Home
