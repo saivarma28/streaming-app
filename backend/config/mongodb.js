@@ -11,6 +11,7 @@ if (!uri) {
 
 let client = null;
 let db = null;
+let connectionPromise = null;
 
 /**
  * Connects to MongoDB Atlas and caches the db instance.
@@ -18,21 +19,33 @@ let db = null;
 export async function connectToDatabase() {
   if (db) return db;
 
+  if (connectionPromise) {
+    return connectionPromise;
+  }
+
   if (!uri) {
     throw new Error("MONGODB_URI is not defined in environment variables.");
   }
+
+  const dbName = process.env.MONGODB_DB_NAME || "streaming_app";
 
   try {
     client = new MongoClient(uri, {
       serverSelectionTimeoutMS: 5000, // Timeout after 5s
     });
     
-    const dbName = process.env.MONGODB_DB_NAME || "streaming_app";
-    await client.connect();
-    db = client.db(dbName);
-    console.log(`SUCCESS: Connected to MongoDB Atlas database: ${dbName}`);
+    connectionPromise = client.connect().then(() => {
+      db = client.db(dbName);
+      console.log(`SUCCESS: Connected to MongoDB Atlas database: ${dbName}`);
+      return db;
+    });
+
+    await connectionPromise;
     return db;
   } catch (error) {
+    connectionPromise = null;
+    client = null;
+    db = null;
     console.error("CRITICAL ERROR: Failed to connect to MongoDB Atlas:", error.message);
     throw error;
   }
@@ -76,6 +89,7 @@ export async function closeDatabaseConnection() {
     await client.close();
     client = null;
     db = null;
+    connectionPromise = null;
     console.log("MongoDB connection closed.");
   }
 }

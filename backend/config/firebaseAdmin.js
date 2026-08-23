@@ -18,8 +18,13 @@ if (
   process.env.FIREBASE_CLIENT_EMAIL &&
   process.env.FIREBASE_PRIVATE_KEY
 ) {
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+  // If the key is wrapped in double quotes, remove them
+  if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+    privateKey = privateKey.substring(1, privateKey.length - 1);
+  }
   // Replace escape sequences in private key (common when key is formatted on a single line in .env)
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, "\n");
+  privateKey = privateKey.replace(/\\n/g, "\n");
   
   serviceAccount = {
     projectId: process.env.FIREBASE_PROJECT_ID,
@@ -47,10 +52,14 @@ if (!serviceAccount) {
   );
 } else {
   try {
-    initializeApp({
-      credential: cert(serviceAccount)
-    });
-    console.log("Firebase Admin SDK initialized successfully");
+    if (getApps().length === 0) {
+      initializeApp({
+        credential: cert(serviceAccount)
+      });
+      console.log("Firebase Admin SDK initialized successfully");
+    } else {
+      console.log("Firebase Admin SDK already initialized (cached)");
+    }
   } catch (error) {
     console.error("Failed to initialize Firebase Admin SDK:", error.message);
   }
