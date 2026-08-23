@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { verifyEmailOtp, sendEmailOtp, syncUser } from "../services/apiService";
@@ -7,6 +7,7 @@ import { FiMail, FiAlertCircle, FiCheckCircle, FiRefreshCw, FiLogOut } from "rea
 export default function VerifyEmailOtp() {
   const { currentUser, register, logout, fetchDbProfile } = useAuth();
   const [otp, setOtp] = useState("");
+  const submittingRef = useRef(false);
   const [tempUser, setTempUser] = useState(null);
   const [otpSent, setOtpSent] = useState(false);
 
@@ -40,11 +41,13 @@ export default function VerifyEmailOtp() {
   }
 
   const handleSendInitialOtp = async () => {
+    if (submittingRef.current) return;
     setError("");
     setMessage("");
     setLoading(true);
 
     try {
+      submittingRef.current = true;
       await sendEmailOtp(tempUser.email);
       setOtpSent(true);
       setMessage("Verification OTP has been sent to your email address!");
@@ -53,24 +56,28 @@ export default function VerifyEmailOtp() {
       setError(err.message || "Failed to send verification OTP. Please try again later.");
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
   const handleVerifyOtpSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError("");
     setMessage("");
 
-    if (!otp || otp.length < 6) {
+    const trimmedOtp = otp.trim();
+    if (!trimmedOtp || trimmedOtp.length < 6) {
       return setError("Please enter a valid 6-digit OTP code.");
     }
 
     let otpVerified = false;
     try {
+      submittingRef.current = true;
       setLoading(true);
       
       // 1. Verify OTP with Backend API
-      await verifyEmailOtp(tempUser.email, otp);
+      await verifyEmailOtp(tempUser.email, trimmedOtp);
       otpVerified = true;
 
       let token = null;
@@ -108,15 +115,18 @@ export default function VerifyEmailOtp() {
       }
     } finally {
       setLoading(false);
+      submittingRef.current = false;
     }
   };
 
   const handleResendOtp = async () => {
+    if (submittingRef.current) return;
     setError("");
     setMessage("");
     setResending(true);
 
     try {
+      submittingRef.current = true;
       await sendEmailOtp(tempUser.email);
       setMessage("A fresh verification OTP code has been sent to your email!");
     } catch (err) {
@@ -124,6 +134,7 @@ export default function VerifyEmailOtp() {
       setError(err.message || "Failed to resend email OTP. Please try again later.");
     } finally {
       setResending(false);
+      submittingRef.current = false;
     }
   };
 

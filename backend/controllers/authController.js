@@ -72,8 +72,9 @@ export async function verifyEmailOtp(req, res) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const trimmedOtp = otp.trim();
 
-  if (otp.length !== 6 || /\D/.test(otp)) {
+  if (trimmedOtp.length !== 6 || /\D/.test(trimmedOtp)) {
     return res.status(400).json({ success: false, message: "OTP must contain exactly 6 digits." });
   }
 
@@ -100,7 +101,7 @@ export async function verifyEmailOtp(req, res) {
     incrementAttempts(normalizedEmail);
 
     // Hash the user-submitted OTP
-    const submittedHash = crypto.createHash("sha256").update(otp).digest("hex");
+    const submittedHash = crypto.createHash("sha256").update(trimmedOtp).digest("hex");
 
     // Secure timing-safe buffer comparison to prevent timing attacks
     const recordBuffer = Buffer.from(record.hashedOtp, "hex");

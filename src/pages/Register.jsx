@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiUser, FiMail, FiPhone, FiLock, FiAlertCircle } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
@@ -6,6 +6,7 @@ import { useAuth } from "../context/AuthContext";
 import { sendEmailOtp } from "../services/apiService";
 
 export default function Register() {
+  const submittingRef = useRef(false);
   // Input states
   const [fullName, setFullName] = useState("");
   const [emailOrPhone, setEmailOrPhone] = useState("");
@@ -25,6 +26,7 @@ export default function Register() {
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
+    if (submittingRef.current) return;
     setError("");
 
     if (!fullName || !emailOrPhone) {
@@ -48,6 +50,7 @@ export default function Register() {
       }
 
       try {
+        submittingRef.current = true;
         setLoading(true);
         // Call API to send a real email OTP
         await sendEmailOtp(emailOrPhone);
@@ -65,6 +68,7 @@ export default function Register() {
         setError(err.message || "Failed to send email OTP. Please check your backend connection.");
       } finally {
         setLoading(false);
+        submittingRef.current = false;
       }
     } else {
       // Phone registration path
@@ -85,7 +89,9 @@ export default function Register() {
   };
 
   const handleGoogleSignIn = async () => {
+    if (submittingRef.current) return;
     try {
+      submittingRef.current = true;
       setError("");
       setGoogleLoading(true);
       await googleLogin();
@@ -97,6 +103,7 @@ export default function Register() {
       }
     } finally {
       setGoogleLoading(false);
+      submittingRef.current = false;
     }
   };
 
