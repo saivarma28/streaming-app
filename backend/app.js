@@ -54,6 +54,21 @@ app.use(
   })
 );
 
+// Root and API default status endpoints
+app.get("/", (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: "Streaming App Backend API is running."
+  });
+});
+
+app.get("/api", (req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: "Streaming App Backend API is running."
+  });
+});
+
 // 1. Health check (GET /api/health) - Verifies running server and MongoDB connection
 app.get("/api/health", async (req, res) => {
   let dbStatus = "Disconnected";
