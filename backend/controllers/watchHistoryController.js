@@ -1,4 +1,5 @@
 import { getDb, getNextSequenceValue } from "../config/mongodb.js";
+import { normalizeMovieUrls } from "./movieController.js";
 
 /**
  * Retrieves the authenticated user's watch history.
@@ -29,6 +30,7 @@ export async function getWatchHistory(req, res) {
           .find({ id: { $in: movie.genreIds || [] } })
           .toArray();
         movie.genres = genres;
+        normalizeMovieUrls(movie);
         record.movie = movie;
       }
     }
@@ -248,6 +250,7 @@ export async function getAllWatchHistories(req, res) {
           .find({ id: { $in: movie.genreIds || [] } })
           .toArray();
         movie.genres = genres;
+        normalizeMovieUrls(movie);
         record.movie = movie;
       }
     }

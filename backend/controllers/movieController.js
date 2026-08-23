@@ -5,6 +5,20 @@ import { uploadToR2 } from "../services/cloudflareR2.js";
 import fs from "fs";
 import path from "path";
 
+// Helper to dynamically normalize private R2 URLs to public ones using environment prefix
+export function normalizeMovieUrls(movie) {
+  if (!movie) return movie;
+  const publicPrefix = process.env.R2_PUBLIC_URL_PREFIX;
+  if (publicPrefix && movie.hlsUrl && movie.hlsUrl.includes("r2.cloudflarestorage.com")) {
+    const cleanPrefix = publicPrefix.replace(/\/$/, "");
+    const parts = movie.hlsUrl.split("/streaming-app/");
+    if (parts.length > 1) {
+      movie.hlsUrl = `${cleanPrefix}/${parts[1]}`;
+    }
+  }
+  return movie;
+}
+
 /**
  * Retrieves movies list.
  * Regular users only see published movies. Admins can see all if query.adminView === 'true'.
@@ -41,6 +55,7 @@ export async function getMovies(req, res) {
         .find({ id: { $in: movie.genreIds || [] } })
         .toArray();
       movie.genres = genres;
+      normalizeMovieUrls(movie);
     }
 
     return res.status(200).json({
@@ -98,6 +113,7 @@ export async function getMovieById(req, res) {
       .find({ id: { $in: movie.genreIds || [] } })
       .toArray();
     movie.genres = genres;
+    normalizeMovieUrls(movie);
 
     return res.status(200).json({
       success: true,
