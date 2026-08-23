@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle } from "react-icons/fi";
+import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle, FiUser } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
-import { getMovieById, getWatchHistory } from "../services/apiService";
+import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 
 export default function MovieDetails() {
@@ -20,20 +20,78 @@ export default function MovieDetails() {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
         
-        // Fetch movie details and watch history parallelly to find resume positions
-        const [movieData, historyData] = await Promise.all([
-          getMovieById(token, id),
-          getWatchHistory(token)
-        ]);
+        const isTmdb = id.startsWith("tmdb-");
+        const isTv = id.startsWith("tmdb-tv-");
+        const cleanId = isTmdb ? id.replace("tmdb-movie-", "").replace("tmdb-tv-", "") : id;
 
-        setMovie(movieData.movie);
+        if (isTmdb) {
+          // Fetch from TMDB proxy backend details
+          const data = isTv 
+            ? await getTmdbTvDetails(token, cleanId)
+            : await getTmdbMovieDetails(token, cleanId);
 
-        // Find if user has a saved watch progress for this movie
-        const savedProgress = historyData.history?.find(
-          (item) => item.movieId === parseInt(id)
-        );
-        if (savedProgress && !savedProgress.completed) {
-          setResumeProgress(savedProgress.progress);
+          const tmdbItem = isTv ? data.tv : data.movie;
+          
+          // Get trailer URL
+          const trailerVideo = tmdbItem.videos?.results?.find(
+            (v) => v.type === "Trailer" && v.site === "YouTube"
+          );
+          const trailerUrl = trailerVideo ? `https://www.youtube.com/watch?v=${trailerVideo.key}` : "";
+
+          // Get cast and director
+          const cast = tmdbItem.credits?.cast?.slice(0, 8) || [];
+          const director = tmdbItem.credits?.crew?.find((c) => c.job === "Director")?.name || "";
+
+          // Build a normalized metadata object matching our existing layout
+          const normalizedMovie = {
+            id: id, // TMDB prefixed ID
+            localId: data.localMovie?.id || null, // local DB match if any
+            hlsUrl: data.localMovie?.hlsUrl || null,
+            isPremium: data.localMovie?.isPremium || false,
+            title: tmdbItem.title || tmdbItem.name,
+            description: tmdbItem.overview,
+            backdropUrl: tmdbItem.backdrop_path ? `https://image.tmdb.org/t/p/original${tmdbItem.backdrop_path}` : "",
+            thumbnailUrl: tmdbItem.poster_path ? `https://image.tmdb.org/t/p/w500${tmdbItem.poster_path}` : "",
+            releaseYear: (tmdbItem.release_date || tmdbItem.first_air_date || "").split("-")[0] || "N/A",
+            duration: isTv 
+              ? `${tmdbItem.number_of_seasons} Seasons (${tmdbItem.number_of_episodes} eps)` 
+              : `${tmdbItem.runtime || "N/A"}`,
+            language: tmdbItem.original_language,
+            maturityRating: tmdbItem.adult ? "18+" : "PG-13",
+            genres: tmdbItem.genres || [],
+            cast,
+            director,
+            trailerUrl
+          };
+
+          setMovie(normalizedMovie);
+
+          // Find if user has watch progress for this TMDB movie in local DB
+          if (data.localMovie) {
+            const historyData = await getWatchHistory(token);
+            const savedProgress = historyData.history?.find(
+              (item) => item.movieId === data.localMovie.id
+            );
+            if (savedProgress && !savedProgress.completed) {
+              setResumeProgress(savedProgress.progress);
+            }
+          }
+        } else {
+          // Fetch movie details and watch history parallelly to find resume positions
+          const [movieData, historyData] = await Promise.all([
+            getMovieById(token, id),
+            getWatchHistory(token)
+          ]);
+
+          setMovie(movieData.movie);
+
+          // Find if user has a saved watch progress for this movie
+          const savedProgress = historyData.history?.find(
+            (item) => item.movieId === parseInt(id)
+          );
+          if (savedProgress && !savedProgress.completed) {
+            setResumeProgress(savedProgress.progress);
+          }
         }
       } catch (err) {
         console.error("Failed to load movie details:", err);
@@ -48,12 +106,15 @@ export default function MovieDetails() {
 
   const handlePlayClick = () => {
     if (!movie) return;
-    if (!movie.hlsUrl) {
-      alert("This movie does not have a streaming video assigned yet.");
+    const playId = movie.localId || movie.id;
+    const streamUrl = movie.hlsUrl;
+    
+    if (!streamUrl) {
+      alert("This global title is not linked to an active Cloudflare R2 streaming resource yet.");
       return;
     }
     // Navigate to player page, passing the start position as a state parameter
-    navigate(`/watch/${movie.id}`, { state: { startPosition: resumeProgress } });
+    navigate(`/watch/${playId}`, { state: { startPosition: resumeProgress } });
   };
 
   if (loading) {
@@ -155,7 +216,7 @@ export default function MovieDetails() {
               </div>
               <div className="flex items-center gap-1.5">
                 <FiClock className="h-4.5 w-4.5 text-red-500" />
-                <span>{movie.duration} min</span>
+                <span>{typeof movie.duration === 'string' && movie.duration.includes("Season") ? movie.duration : `${movie.duration} min`}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <FiGlobe className="h-4.5 w-4.5 text-red-500" />
@@ -166,6 +227,29 @@ export default function MovieDetails() {
             <p className="text-gray-300 text-base leading-relaxed font-light mb-8 max-w-3xl">
               {movie.description}
             </p>
+
+            {/* Director and Cast */}
+            {movie.director && (
+              <div className="mb-6">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Director</h4>
+                <p className="text-gray-300 text-sm font-medium">{movie.director}</p>
+              </div>
+            )}
+
+            {movie.cast && movie.cast.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Cast</h4>
+                <div className="flex flex-wrap gap-3">
+                  {movie.cast.map((actor) => (
+                    <div key={actor.id} className="flex items-center gap-1.5 bg-white/5 border border-white/5 px-2.5 py-1 rounded-lg text-xs text-gray-300 font-medium">
+                      <FiUser className="h-3.5 w-3.5 text-gray-400" />
+                      <span>{actor.name}</span>
+                      <span className="text-[10px] text-gray-500">as {actor.character}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Genres Tag List */}
             {movie.genres && movie.genres.length > 0 && (

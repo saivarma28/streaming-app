@@ -2,7 +2,16 @@ import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiPlay, FiInfo, FiPlus, FiChevronRight, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
-import { getMovies, getGenres, getWatchHistory } from "../services/apiService";
+import { 
+  getMovies, 
+  getGenres, 
+  getWatchHistory,
+  getTmdbPopularMovies,
+  getTmdbTrendingMovies,
+  getTmdbTopRatedMovies,
+  getTmdbPopularTv,
+  searchTmdb
+} from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 
 export default function Home() {
@@ -15,6 +24,15 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  // TMDB integration states
+  const [tmdbTrending, setTmdbTrending] = useState([]);
+  const [tmdbPopularMovies, setTmdbPopularMovies] = useState([]);
+  const [tmdbTopRated, setTmdbTopRated] = useState([]);
+  const [tmdbPopularTv, setTmdbPopularTv] = useState([]);
+  const [tmdbError, setTmdbError] = useState(false);
+  const [tmdbSearchResults, setTmdbSearchResults] = useState([]);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -35,6 +53,28 @@ export default function Home() {
         setMovies(moviesData.movies || []);
         setGenres(genresData.genres || []);
         setWatchHistory(historyData.history || []);
+
+        // Load TMDB catalog blocks in parallel (fail-safe error isolation)
+        try {
+          const [trendingData, popularData, topRatedData, popularTvData] = await Promise.all([
+            getTmdbTrendingMovies(token).catch(e => { console.warn("TMDB trending load error:", e.message); return { results: [] }; }),
+            getTmdbPopularMovies(token).catch(e => { console.warn("TMDB popular load error:", e.message); return { results: [] }; }),
+            getTmdbTopRatedMovies(token).catch(e => { console.warn("TMDB top rated load error:", e.message); return { results: [] }; }),
+            getTmdbPopularTv(token).catch(e => { console.warn("TMDB popular TV load error:", e.message); return { results: [] }; })
+          ]);
+          
+          setTmdbTrending(trendingData.results || []);
+          setTmdbPopularMovies(popularData.results || []);
+          setTmdbTopRated(topRatedData.results || []);
+          setTmdbPopularTv(popularTvData.results || []);
+          
+          if (!trendingData.results && !popularData.results && !topRatedData.results && !popularTvData.results) {
+            setTmdbError(true);
+          }
+        } catch (tmdbErr) {
+          console.warn("Failed to retrieve TMDB sections:", tmdbErr.message);
+          setTmdbError(true);
+        }
       } catch (err) {
         console.error("Failed to load catalog:", err);
         setError("Could not load catalog. Please check your connection.");
@@ -45,6 +85,30 @@ export default function Home() {
 
     loadCatalog();
   }, [currentUser]);
+
+  // Debounced TMDB search integration
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setTmdbSearchResults([]);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        setSearching(true);
+        if (!currentUser) return;
+        const token = await currentUser.getIdToken();
+        const data = await searchTmdb(token, searchQuery);
+        setTmdbSearchResults(data.results || []);
+      } catch (err) {
+        console.error("TMDB Search Error:", err.message);
+      } finally {
+        setSearching(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, currentUser]);
 
   // Filter movies based on search and genre selection
   const filteredMovies = movies.filter(movie => {
@@ -265,56 +329,123 @@ export default function Home() {
           </div>
         ) : (searchQuery || selectedGenreId) ? (
           // Flat Grid View for Searched/Filtered Results
-          <div className="space-y-6 text-left">
-            <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
-              <h3 className="text-xl font-bold tracking-tight text-white uppercase animate-pulse">Search & Filter Results ({filteredMovies.length})</h3>
+          <div className="space-y-12 text-left">
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
+                <h3 className="text-xl font-bold tracking-tight text-white uppercase animate-pulse">Local Library Results ({filteredMovies.length})</h3>
+              </div>
+
+              {filteredMovies.length === 0 ? (
+                <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
+                  <h3 className="text-lg font-bold text-white mb-1">No Matching Local Titles</h3>
+                  <p className="text-gray-400 font-light text-xs">
+                    We couldn't find any titles matching your search term or genre choice in the local database.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                  {filteredMovies.map((movie) => (
+                    <div
+                      key={movie.id}
+                      onClick={() => navigate(`/movie/${movie.id}`)}
+                      className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                    >
+                      {movie.thumbnailUrl ? (
+                        <img
+                          src={movie.thumbnailUrl}
+                          alt={movie.title}
+                          className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                          <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
+                        </div>
+                      )}
+
+                      <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
+
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                        <div className="flex items-center justify-between mb-1.5">
+                          {movie.isPremium && (
+                            <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                              Premium
+                            </span>
+                          )}
+                          <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
+                        </div>
+                        <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
+                          {movie.title}
+                        </h4>
+                        <p className="text-[10px] text-gray-400 mt-1 truncate">{movie.genres.map(g => g.name).join(" • ")}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {filteredMovies.length === 0 ? (
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
-                <h3 className="text-lg font-bold text-white mb-1">No Matching Titles</h3>
-                <p className="text-gray-400 font-light text-xs">
-                  We couldn't find any titles matching your search term or genre choice. Try adjusting your filter.
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredMovies.map((movie) => (
-                  <div
-                    key={movie.id}
-                    onClick={() => navigate(`/movie/${movie.id}`)}
-                    className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
-                  >
-                    {movie.thumbnailUrl ? (
-                      <img
-                        src={movie.thumbnailUrl}
-                        alt={movie.title}
-                        className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
-                      </div>
-                    )}
+            {/* TMDB Global Search Results */}
+            {searchQuery.trim() !== "" && (
+              <div className="space-y-6 pt-6 border-t border-white/5">
+                <div className="flex items-center gap-3 border-l-4 border-amber-500 pl-3">
+                  <h3 className="text-xl font-bold tracking-tight text-white uppercase">Global Search Results ({tmdbSearchResults.length})</h3>
+                </div>
 
-                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
-                      <div className="flex items-center justify-between mb-1.5">
-                        {movie.isPremium && (
-                          <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                            Premium
-                          </span>
-                        )}
-                        <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
-                      </div>
-                      <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                        {movie.title}
-                      </h4>
-                      <p className="text-[10px] text-gray-400 mt-1 truncate">{movie.genres.map(g => g.name).join(" • ")}</p>
-                    </div>
+                {searching ? (
+                  <div className="flex justify-center py-12">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-amber-500 border-t-transparent"></div>
                   </div>
-                ))}
+                ) : tmdbSearchResults.length === 0 ? (
+                  <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
+                    <h3 className="text-lg font-bold text-white mb-1">No Global Results</h3>
+                    <p className="text-gray-400 font-light text-xs">
+                      We couldn't find any global titles matching "{searchQuery}" on TMDB.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {tmdbSearchResults.map((item) => {
+                      const isTv = item.media_type === "tv" || (!item.title && item.name);
+                      const releaseDate = item.release_date || item.first_air_date || "";
+                      const releaseYear = releaseDate.split("-")[0] || "N/A";
+                      const rating = item.vote_average ? item.vote_average.toFixed(1) : "N/A";
+                      
+                      return (
+                        <div
+                          key={`tmdb-${item.id}`}
+                          onClick={() => navigate(`/movie/tmdb-${isTv ? "tv" : "movie"}-${item.id}`)}
+                          className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                        >
+                          {item.backdrop_path || item.poster_path ? (
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
+                              alt={item.title || item.name}
+                              className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                          ) : (
+                            <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-amber-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4 text-center">
+                              <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">{item.title || item.name}</span>
+                            </div>
+                          )}
+
+                          <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                {isTv ? "TV Show" : "Movie"}
+                              </span>
+                              <span className="text-xs font-medium text-gray-400 ml-auto">{releaseYear} • ⭐ {rating}</span>
+                            </div>
+                            <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300">
+                              {item.title || item.name}
+                            </h4>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -422,6 +553,157 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* ================= TMDB SECTION ================= */}
+            <div className="border-t border-white/5 pt-12 space-y-12">
+              <div className="flex items-center gap-3 pl-1">
+                <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <h3 className="text-2xl font-black tracking-widest text-white uppercase">GLOBAL TMDB CATALOG</h3>
+              </div>
+
+              {tmdbError ? (
+                <div className="rounded-2xl border border-amber-500/10 bg-amber-500/5 p-8 text-center max-w-md mx-auto">
+                  <h3 className="text-sm font-bold text-amber-500 mb-1">Global Catalog Offline</h3>
+                  <p className="text-gray-400 font-light text-xs leading-relaxed">
+                    Could not connect to TMDB services. Please ensure TMDB credentials are set up on the backend.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Row 1: Trending Now */}
+                  {tmdbTrending.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-l-4 border-amber-500 pl-3">
+                        <h3 className="text-xl font-bold tracking-tight text-white uppercase">Trending Now</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {tmdbTrending.slice(0, 8).map((item) => (
+                          <div
+                            key={`trending-${item.id}`}
+                            onClick={() => navigate(`/movie/tmdb-movie-${item.id}`)}
+                            className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                          >
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
+                              alt={item.title}
+                              className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                            <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-gray-400">{item.release_date ? item.release_date.split("-")[0] : ""} • ⭐ {item.vote_average ? item.vote_average.toFixed(1) : ""}</span>
+                              </div>
+                              <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300 font-bold">
+                                {item.title}
+                              </h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 2: Popular Movies */}
+                  {tmdbPopularMovies.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-l-4 border-amber-500 pl-3">
+                        <h3 className="text-xl font-bold tracking-tight text-white uppercase">Popular Movies</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {tmdbPopularMovies.slice(0, 8).map((item) => (
+                          <div
+                            key={`popular-m-${item.id}`}
+                            onClick={() => navigate(`/movie/tmdb-movie-${item.id}`)}
+                            className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                          >
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
+                              alt={item.title}
+                              className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                            <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-gray-400">{item.release_date ? item.release_date.split("-")[0] : ""} • ⭐ {item.vote_average ? item.vote_average.toFixed(1) : ""}</span>
+                              </div>
+                              <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300 font-bold">
+                                {item.title}
+                              </h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Top Rated Movies */}
+                  {tmdbTopRated.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-l-4 border-amber-500 pl-3">
+                        <h3 className="text-xl font-bold tracking-tight text-white uppercase">Top Rated</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {tmdbTopRated.slice(0, 8).map((item) => (
+                          <div
+                            key={`top-rated-${item.id}`}
+                            onClick={() => navigate(`/movie/tmdb-movie-${item.id}`)}
+                            className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                          >
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
+                              alt={item.title}
+                              className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                            <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-gray-400">{item.release_date ? item.release_date.split("-")[0] : ""} • ⭐ {item.vote_average ? item.vote_average.toFixed(1) : ""}</span>
+                              </div>
+                              <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300 font-bold">
+                                {item.title}
+                              </h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 4: Popular TV Shows */}
+                  {tmdbPopularTv.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between border-l-4 border-amber-500 pl-3">
+                        <h3 className="text-xl font-bold tracking-tight text-white uppercase">Popular TV Shows</h3>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {tmdbPopularTv.slice(0, 8).map((item) => (
+                          <div
+                            key={`popular-tv-${item.id}`}
+                            onClick={() => navigate(`/movie/tmdb-tv-${item.id}`)}
+                            className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                          >
+                            <img
+                              src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
+                              alt={item.name}
+                              className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                            />
+                            <div className="absolute inset-0 border-2 border-transparent group-hover:border-amber-500/30 rounded-2xl transition-all duration-300"></div>
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className="text-xs font-medium text-gray-400">{item.first_air_date ? item.first_air_date.split("-")[0] : ""} • ⭐ {item.vote_average ? item.vote_average.toFixed(1) : ""}</span>
+                              </div>
+                              <h4 className="text-white font-bold text-base leading-tight group-hover:text-amber-400 transition-colors duration-300 font-bold">
+                                {item.name}
+                              </h4>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </div>
         )}
       </div>
