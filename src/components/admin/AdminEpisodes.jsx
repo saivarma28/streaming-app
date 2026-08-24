@@ -5,7 +5,7 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import { 
-  getTvShowById, getEpisodes, createEpisode, updateEpisode, deleteEpisode 
+  getTvShowById, getEpisodes, createEpisode, updateEpisode, deleteEpisode, getTvShowPresignedUrl 
 } from "../../services/apiService";
 
 export default function AdminEpisodes() {
@@ -32,6 +32,11 @@ export default function AdminEpisodes() {
     isPublished: false
   });
   const [episodeVideoFile, setEpisodeVideoFile] = useState(null);
+  const [videoSourceType, setVideoSourceType] = useState("file");
+  const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(""); // "", "uploading", "success", "failed"
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState("");
 
   // Deletion state
   const [deleteTargetId, setDeleteTargetId] = useState(null);
@@ -78,6 +83,11 @@ export default function AdminEpisodes() {
       isPublished: false
     });
     setEpisodeVideoFile(null);
+    setVideoSourceType("file");
+    setVideoUrlInput("");
+    setUploadProgress(0);
+    setUploadStatus("");
+    setUploadedVideoUrl("");
     setIsModalOpen(true);
   };
 
@@ -93,7 +103,76 @@ export default function AdminEpisodes() {
       isPublished: !!ep.isPublished
     });
     setEpisodeVideoFile(null);
+    if (ep.hlsUrl) {
+      setVideoUrlInput(ep.hlsUrl);
+      setVideoSourceType("url");
+    } else {
+      setVideoUrlInput("");
+      setVideoSourceType("file");
+    }
+    setUploadProgress(0);
+    setUploadStatus("");
+    setUploadedVideoUrl("");
     setIsModalOpen(true);
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setError("Please select a valid video file format (e.g., .mp4, .mkv, .mov).");
+      return;
+    }
+    setEpisodeVideoFile(file);
+    setUploadStatus("");
+    setUploadedVideoUrl("");
+    setUploadProgress(0);
+  };
+
+  const handleDirectUpload = async () => {
+    if (!episodeVideoFile) return;
+    setError("");
+    setUploadProgress(0);
+    setUploadStatus("uploading");
+
+    try {
+      const token = await currentUser.getIdToken();
+      // Get PUT presigned URL from backend
+      const { uploadUrl, videoUrl } = await getTvShowPresignedUrl(token, episodeVideoFile.name, episodeVideoFile.type);
+
+      // Perform direct upload to Cloudflare R2 using XMLHttpRequest (required for upload progress)
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl, true);
+      xhr.setRequestHeader("Content-Type", episodeVideoFile.type);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const pct = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(pct);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          setUploadedVideoUrl(videoUrl);
+          setUploadStatus("success");
+        } else {
+          setUploadStatus("failed");
+          setError(`Direct upload failed with status code ${xhr.status}.`);
+        }
+      };
+
+      xhr.onerror = () => {
+        setUploadStatus("failed");
+        setError("Network error occurred during video file upload.");
+      };
+
+      xhr.send(episodeVideoFile);
+    } catch (err) {
+      console.error("Direct upload initialization failed:", err);
+      setUploadStatus("failed");
+      setError(err.message || "Failed to initialize video upload.");
+    }
   };
 
   const handleModalSubmit = async (e) => {
@@ -113,8 +192,18 @@ export default function AdminEpisodes() {
       formData.append("releaseDate", episodeForm.releaseDate);
       formData.append("isPublished", episodeForm.isPublished);
 
-      if (episodeVideoFile) {
-        formData.append("video", episodeVideoFile);
+      if (videoSourceType === "file") {
+        if (uploadedVideoUrl) {
+          formData.append("videoUrl", uploadedVideoUrl);
+        } else if (episodeVideoFile) {
+          setError("Please click the 'Upload Video' button to upload the selected file before saving.");
+          setActionLoading(false);
+          return;
+        }
+      } else {
+        if (videoUrlInput) {
+          formData.append("videoUrl", videoUrlInput);
+        }
       }
 
       if (editingEpisode) {
@@ -380,23 +469,97 @@ export default function AdminEpisodes() {
                 />
               </div>
 
-              {/* Upload source video to R2 */}
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">
-                  Episode Video File (.mp4 / Cloudflare R2 Upload)
+              {/* Video Source Option */}
+              <div className="space-y-3">
+                <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                  Video Source
                 </label>
-                <div className="relative border border-dashed border-white/10 rounded-xl p-4 bg-white/2 hover:bg-white/5 transition-all text-center flex flex-col items-center justify-center cursor-pointer">
-                  <input
-                    type="file"
-                    accept="video/*"
-                    onChange={(e) => setEpisodeVideoFile(e.target.files[0])}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <FiUpload className="h-6 w-6 text-[#e50914] mb-2" />
-                  <p className="text-xs font-bold text-gray-300">
-                    {episodeVideoFile ? episodeVideoFile.name : editingEpisode ? "Click to replace existing video stream file" : "Select video file"}
-                  </p>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 select-none cursor-pointer">
+                    <input
+                      type="radio"
+                      name="videoSourceType"
+                      value="file"
+                      checked={videoSourceType === "file"}
+                      onChange={() => setVideoSourceType("file")}
+                      className="text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5 border-white/10 text-xs"
+                    />
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Upload Video File</span>
+                  </label>
+                  <label className="flex items-center gap-2 select-none cursor-pointer">
+                    <input
+                      type="radio"
+                      name="videoSourceType"
+                      value="url"
+                      checked={videoSourceType === "url"}
+                      onChange={() => setVideoSourceType("url")}
+                      className="text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5 border-white/10 text-xs"
+                    />
+                    <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Video URL</span>
+                  </label>
                 </div>
+
+                {videoSourceType === "file" ? (
+                  <div className="space-y-3">
+                    <div className="relative border border-dashed border-white/10 rounded-xl p-4 bg-white/2 hover:bg-white/5 transition-all text-center flex flex-col items-center justify-center cursor-pointer">
+                      <input
+                        type="file"
+                        accept="video/*"
+                        onChange={handleFileChange}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <FiUpload className="h-6 w-6 text-[#e50914] mb-2" />
+                      <p className="text-xs font-bold text-gray-300">
+                        {episodeVideoFile ? episodeVideoFile.name : editingEpisode ? "Click to replace existing video stream file" : "Select video file"}
+                      </p>
+                      <p className="text-[10px] text-gray-500 mt-0.5">Supports raw video formats (MP4, MKV, etc.) uploaded directly to R2.</p>
+                    </div>
+
+                    {episodeVideoFile && (
+                      <div className="flex flex-col gap-2 p-3 bg-white/5 rounded-xl border border-white/5 text-left">
+                        <div className="flex justify-between items-center text-[10px]">
+                          <span className="text-gray-400 font-semibold truncate max-w-[180px]">Selected: {episodeVideoFile.name}</span>
+                          {uploadStatus === "uploading" && (
+                            <span className="text-red-500 font-bold animate-pulse">Uploading {uploadProgress}%</span>
+                          )}
+                          {uploadStatus === "success" && (
+                            <span className="text-emerald-500 font-bold">✓ Video uploaded successfully</span>
+                          )}
+                          {uploadStatus === "failed" && (
+                            <span className="text-red-500 font-bold">✗ Upload failed</span>
+                          )}
+                        </div>
+
+                        {uploadStatus === "uploading" && (
+                          <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
+                            <div className="bg-red-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                          </div>
+                        )}
+
+                        {uploadStatus !== "success" && (
+                          <button
+                            type="button"
+                            disabled={uploadStatus === "uploading"}
+                            onClick={handleDirectUpload}
+                            className="w-full py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-[10px] font-bold transition-all cursor-pointer"
+                          >
+                            {uploadStatus === "uploading" ? "Uploading to Cloudflare R2..." : "Upload Video"}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="e.g. https://my-bucket.r2.dev/tvshows/episode.mp4"
+                      value={videoUrlInput}
+                      onChange={(e) => setVideoUrlInput(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs text-white outline-none focus:border-red-500/40 focus:bg-white/10 transition-all font-semibold"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-between items-center pt-2">

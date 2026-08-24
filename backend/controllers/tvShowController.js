@@ -1,5 +1,7 @@
 import { getDb, getNextSequenceValue } from "../config/mongodb.js";
-import { uploadToR2 } from "../services/cloudflareR2.js";
+import { uploadToR2, s3, isR2Configured, bucketNameExport } from "../services/cloudflareR2.js";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
 
@@ -426,7 +428,8 @@ export async function createEpisode(req, res) {
     episodeNumber,
     duration,
     releaseDate,
-    isPublished
+    isPublished,
+    videoUrl
   } = req.body;
 
   if (!title || !episodeNumber) {
@@ -462,8 +465,8 @@ export async function createEpisode(req, res) {
       duration: parsedDuration,
       releaseDate: releaseDate || "",
       isPublished: parsedIsPublished,
-      hlsUrl: null,
-      sourceVideoPath: null,
+      hlsUrl: videoUrl || null,
+      sourceVideoPath: videoUrl || null,
       transcodingStatus: req.file ? "UPLOADING" : "READY",
       createdAt: new Date(),
       updatedAt: new Date()
@@ -544,7 +547,8 @@ export async function updateEpisode(req, res) {
     episodeNumber,
     duration,
     releaseDate,
-    isPublished
+    isPublished,
+    videoUrl
   } = req.body;
 
   try {
@@ -567,6 +571,12 @@ export async function updateEpisode(req, res) {
     if (duration !== undefined) updateFields.duration = parseInt(duration);
     if (episodeNumber !== undefined) updateFields.episodeNumber = parseInt(episodeNumber);
     if (isPublished !== undefined) updateFields.isPublished = isPublished === "true" || isPublished === true;
+    if (videoUrl !== undefined) {
+      updateFields.videoUrl = videoUrl;
+      updateFields.hlsUrl = videoUrl;
+      updateFields.sourceVideoPath = videoUrl;
+      updateFields.transcodingStatus = "READY";
+    }
 
     if (req.file) {
       updateFields.transcodingStatus = "UPLOADING";
@@ -637,5 +647,55 @@ export async function deleteEpisode(req, res) {
   } catch (error) {
     console.error("deleteEpisode Controller Error:", error.message);
     return res.status(500).json({ success: false, message: "Failed to delete episode." });
+  }
+}
+
+export async function getTvShowPresignedUploadUrl(req, res) {
+  if (!isR2Configured) {
+    return res.status(400).json({
+      success: false,
+      message: "Cloudflare R2 is not configured in the environment."
+    });
+  }
+
+  const { filename, contentType } = req.body;
+  if (!filename || !contentType) {
+    return res.status(400).json({
+      success: false,
+      message: "Filename and contentType are required fields."
+    });
+  }
+
+  try {
+    const cleanFilename = filename.replace(/\s+/g, "_");
+    const destinationPath = `tvshows/uploads/video_${Date.now()}_${cleanFilename}`;
+
+    const command = new PutObjectCommand({
+      Bucket: bucketNameExport,
+      Key: destinationPath,
+      ContentType: contentType
+    });
+
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+    let publicUrl;
+    if (process.env.R2_PUBLIC_URL_PREFIX) {
+      const prefix = process.env.R2_PUBLIC_URL_PREFIX.replace(/\/$/, "");
+      publicUrl = `${prefix}/${destinationPath}`;
+    } else {
+      publicUrl = `${process.env.R2_ENDPOINT}/${bucketNameExport}/${destinationPath}`;
+    }
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl: presignedUrl,
+      videoUrl: publicUrl
+    });
+  } catch (error) {
+    console.error("Failed to generate presigned R2 upload URL for TV show:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate presigned upload URL."
+    });
   }
 }

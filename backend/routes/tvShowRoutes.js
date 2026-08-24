@@ -11,12 +11,15 @@ import {
   getEpisodeById,
   createEpisode,
   updateEpisode,
-  deleteEpisode
+  deleteEpisode,
+  getTvShowPresignedUploadUrl
 } from "../controllers/tvShowController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
 
 const router = express.Router();
+
+router.post("/presigned-url", authMiddleware, adminMiddleware, getTvShowPresignedUploadUrl);
 
 const upload = multer({
   storage: multer.memoryStorage(),
