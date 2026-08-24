@@ -49,6 +49,7 @@ export default function MovieDetails() {
           // Build a normalized metadata object matching our existing layout
           const normalizedMovie = {
             id: id, // TMDB prefixed ID
+            isTv,
             localId: data.localMovie?.id || null, // local DB match if any
             hlsUrl: data.localMovie?.hlsUrl || null,
             isPremium: data.localMovie?.isPremium || false,
@@ -257,7 +258,7 @@ export default function MovieDetails() {
               </div>
               <div className="flex items-center gap-1.5">
                 <FiClock className="h-4.5 w-4.5 text-red-500" />
-                <span>{typeof movie.duration === 'string' && movie.duration.includes("Season") ? movie.duration : `${movie.duration} min`}</span>
+                <span>{movie.isTv ? movie.duration : `${movie.duration} min`}</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <FiGlobe className="h-4.5 w-4.5 text-red-500" />
