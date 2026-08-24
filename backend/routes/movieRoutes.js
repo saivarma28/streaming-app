@@ -6,7 +6,8 @@ import {
   createMovie,
   updateMovie,
   deleteMovie,
-  getTranscodingStatus
+  getTranscodingStatus,
+  getPresignedUploadUrl
 } from "../controllers/movieController.js";
 import { authMiddleware } from "../middleware/authMiddleware.js";
 import { adminMiddleware } from "../middleware/adminMiddleware.js";
@@ -29,6 +30,9 @@ router.get("/:id", authMiddleware, getMovieById);
 
 // GET /api/movies/:id/transcoding-status - Retrieves transcoding status (auth required)
 router.get("/:id/transcoding-status", authMiddleware, getTranscodingStatus);
+
+// POST /api/movies/presigned-url - Generates presigned PUT URL for direct R2 uploads (Admin only)
+router.post("/presigned-url", authMiddleware, adminMiddleware, getPresignedUploadUrl);
 
 // POST /api/movies - Creates movie & handles direct stream video upload (Admin only)
 router.post("/", authMiddleware, adminMiddleware, upload.single("video"), createMovie);

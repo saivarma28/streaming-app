@@ -7,10 +7,10 @@ const endpoint = process.env.R2_ENDPOINT;
 const accessKeyId = process.env.R2_ACCESS_KEY_ID;
 const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
 const bucketName = process.env.R2_BUCKET_NAME;
+export const isR2Configured = endpoint && accessKeyId && secretAccessKey && bucketName;
+export const bucketNameExport = bucketName;
 
-const isR2Configured = endpoint && accessKeyId && secretAccessKey && bucketName;
-
-let s3 = null;
+export let s3 = null;
 if (isR2Configured) {
   s3 = new S3Client({
     endpoint: endpoint,
@@ -23,7 +23,6 @@ if (isR2Configured) {
 } else {
   console.warn("WARNING: Cloudflare R2 is not fully configured in environment variables.");
 }
-
 /**
  * Uploads a file buffer to Cloudflare R2.
  * 

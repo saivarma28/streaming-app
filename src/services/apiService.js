@@ -172,6 +172,32 @@ export async function getMovies(token, genreId = null, adminView = false) {
 }
 
 /**
+ * Request a presigned S3/R2 PUT URL for direct large video uploads.
+ * POST /api/movies/presigned-url
+ */
+export async function getMoviePresignedUrl(token, filename, contentType) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/movies/presigned-url`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ filename, contentType })
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to generate presigned upload URL.");
+    }
+    return data;
+  } catch (error) {
+    console.error("getMoviePresignedUrl API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
  * Fetch a single movie by ID.
  * GET /api/movies/:id
  */

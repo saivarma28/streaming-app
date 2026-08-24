@@ -1,7 +1,9 @@
 import { getDb, getNextSequenceValue } from "../config/mongodb.js";
 import { uploadToGCS } from "../services/googleCloudStorage.js";
 import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
-import { uploadToR2 } from "../services/cloudflareR2.js";
+import { uploadToR2, s3, isR2Configured, bucketNameExport } from "../services/cloudflareR2.js";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import fs from "fs";
 import path from "path";
 
@@ -147,7 +149,8 @@ export async function createMovie(req, res) {
     language,
     isPremium,
     isPublished,
-    genreIds
+    genreIds,
+    videoUrl
   } = req.body;
 
   // Validation
@@ -201,9 +204,9 @@ export async function createMovie(req, res) {
       thumbnailUrl: thumbnailUrl || null,
       backdropUrl: backdropUrl || null,
       trailerUrl: trailerUrl || null,
-      videoUrl: null,
-      hlsUrl: null,
-      sourceVideoPath: null,
+      videoUrl: videoUrl || null,
+      hlsUrl: videoUrl || null,
+      sourceVideoPath: videoUrl || null,
       transcoderJobName: null,
       duration: parsedDuration,
       releaseYear: parsedReleaseYear,
@@ -348,7 +351,8 @@ export async function updateMovie(req, res) {
     language,
     isPremium,
     isPublished,
-    genreIds
+    genreIds,
+    videoUrl
   } = req.body;
 
   try {
@@ -474,6 +478,12 @@ export async function updateMovie(req, res) {
     if (parsedIsPremium !== undefined) updateFields.isPremium = parsedIsPremium;
     if (parsedIsPublished !== undefined) updateFields.isPublished = parsedIsPublished;
     if (parsedGenreIds !== undefined) updateFields.genreIds = parsedGenreIds;
+    if (videoUrl !== undefined) {
+      updateFields.videoUrl = videoUrl;
+      updateFields.hlsUrl = videoUrl;
+      updateFields.sourceVideoPath = videoUrl;
+      updateFields.transcodingStatus = "READY";
+    }
     Object.assign(updateFields, uploadResult);
     updateFields.updatedAt = new Date();
 
@@ -592,6 +602,57 @@ export async function getTranscodingStatus(req, res) {
     return res.status(500).json({
       success: false,
       message: "An error occurred while fetching transcoding status."
+    });
+  }
+}
+
+export async function getPresignedUploadUrl(req, res) {
+  if (!isR2Configured) {
+    return res.status(400).json({
+      success: false,
+      message: "Cloudflare R2 is not configured in the environment."
+    });
+  }
+
+  const { filename, contentType } = req.body;
+  if (!filename || !contentType) {
+    return res.status(400).json({
+      success: false,
+      message: "Filename and contentType are required fields."
+    });
+  }
+
+  try {
+    const cleanFilename = filename.replace(/\s+/g, "_");
+    const destinationPath = `movies/uploads/video_${Date.now()}_${cleanFilename}`;
+
+    const command = new PutObjectCommand({
+      Bucket: bucketNameExport,
+      Key: destinationPath,
+      ContentType: contentType
+    });
+
+    // Generate PUT presigned URL valid for 1 hour (3600 seconds)
+    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+
+    let publicUrl;
+    if (process.env.R2_PUBLIC_URL_PREFIX) {
+      const prefix = process.env.R2_PUBLIC_URL_PREFIX.replace(/\/$/, "");
+      publicUrl = `${prefix}/${destinationPath}`;
+    } else {
+      publicUrl = `${process.env.R2_ENDPOINT}/${bucketNameExport}/${destinationPath}`;
+    }
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl: presignedUrl,
+      videoUrl: publicUrl
+    });
+  } catch (error) {
+    console.error("Failed to generate presigned R2 upload URL:", error.message);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate presigned upload URL."
     });
   }
 }

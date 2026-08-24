@@ -5,7 +5,7 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import { 
-  getMovieById, createMovie, updateMovie, getGenres 
+  getMovieById, createMovie, updateMovie, getGenres, getMoviePresignedUrl 
 } from "../../services/apiService";
 
 export default function AdminMovieForm() {
@@ -35,6 +35,11 @@ export default function AdminMovieForm() {
     tmdbId: ""
   });
   const [videoFile, setVideoFile] = useState(null);
+  const [videoSourceType, setVideoSourceType] = useState("file");
+  const [videoUrlInput, setVideoUrlInput] = useState("");
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStatus, setUploadStatus] = useState(""); // "", "uploading", "success", "failed"
+  const [uploadedVideoUrl, setUploadedVideoUrl] = useState("");
 
   useEffect(() => {
     async function loadFormContext() {
@@ -66,6 +71,10 @@ export default function AdminMovieForm() {
               selectedGenreIds: m.genreIds || [],
               tmdbId: m.tmdbId ? String(m.tmdbId) : ""
             });
+            if (m.hlsUrl) {
+              setVideoUrlInput(m.hlsUrl);
+              setVideoSourceType("url");
+            }
           }
         }
       } catch (err) {
@@ -94,6 +103,65 @@ export default function AdminMovieForm() {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setError("Please select a valid video file format (e.g., .mp4, .mkv, .mov).");
+      return;
+    }
+    setVideoFile(file);
+    setUploadStatus("");
+    setUploadedVideoUrl("");
+    setUploadProgress(0);
+  };
+
+  const handleDirectUpload = async () => {
+    if (!videoFile) return;
+    setError("");
+    setUploadProgress(0);
+    setUploadStatus("uploading");
+
+    try {
+      const token = await currentUser.getIdToken();
+      // Get PUT presigned URL from backend
+      const { uploadUrl, videoUrl } = await getMoviePresignedUrl(token, videoFile.name, videoFile.type);
+
+      // Perform direct upload to Cloudflare R2 using XMLHttpRequest (required for upload progress)
+      const xhr = new XMLHttpRequest();
+      xhr.open("PUT", uploadUrl, true);
+      xhr.setRequestHeader("Content-Type", videoFile.type);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const pct = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(pct);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status === 200) {
+          setUploadedVideoUrl(videoUrl);
+          setUploadStatus("success");
+        } else {
+          setUploadStatus("failed");
+          setError(`Direct upload failed with status code ${xhr.status}.`);
+        }
+      };
+
+      xhr.onerror = () => {
+        setUploadStatus("failed");
+        setError("Network error occurred during video file upload.");
+      };
+
+      xhr.send(videoFile);
+    } catch (err) {
+      console.error("Direct upload initialization failed:", err);
+      setUploadStatus("failed");
+      setError(err.message || "Failed to initialize video upload.");
+    }
+  };
+
   const handleFormSubmit = async (e) => {
     e.preventDefault();
     setError("");
@@ -118,8 +186,18 @@ export default function AdminMovieForm() {
         formData.append("tmdbId", movieForm.tmdbId);
       }
 
-      if (videoFile) {
-        formData.append("video", videoFile);
+      if (videoSourceType === "file") {
+        if (uploadedVideoUrl) {
+          formData.append("videoUrl", uploadedVideoUrl);
+        } else if (videoFile) {
+          setError("Please click the 'Upload Video' button to upload the selected file before saving.");
+          setActionLoading(false);
+          return;
+        }
+      } else {
+        if (videoUrlInput) {
+          formData.append("videoUrl", videoUrlInput);
+        }
       }
 
       if (isEditMode) {
@@ -300,24 +378,97 @@ export default function AdminMovieForm() {
               />
             </div>
 
-            {/* Video File Upload */}
-            <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                Video Streaming Source File (.mp4 / Cloudflare R2 Upload)
+            {/* Video Source Option */}
+            <div className="space-y-4">
+              <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                Video Source
               </label>
-              <div className="relative border-2 border-dashed border-white/10 rounded-xl p-6 bg-white/2 hover:bg-white/5 transition-all text-center flex flex-col items-center justify-center cursor-pointer">
-                <input
-                  type="file"
-                  accept="video/*"
-                  onChange={(e) => setVideoFile(e.target.files[0])}
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                />
-                <FiUpload className="h-8 w-8 text-[#e50914] mb-3" />
-                <p className="text-sm font-bold text-gray-300">
-                  {videoFile ? videoFile.name : isEditMode ? "Click to upload a new video file replacement" : "Select video file"}
-                </p>
-                <p className="text-xs text-gray-500 mt-1">Supports MP4 streams up to 100MB.</p>
+              <div className="flex gap-6">
+                <label className="flex items-center gap-2 select-none cursor-pointer">
+                  <input
+                    type="radio"
+                    name="videoSourceType"
+                    value="file"
+                    checked={videoSourceType === "file"}
+                    onChange={() => setVideoSourceType("file")}
+                    className="text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5 border-white/10"
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Upload Video File</span>
+                </label>
+                <label className="flex items-center gap-2 select-none cursor-pointer">
+                  <input
+                    type="radio"
+                    name="videoSourceType"
+                    value="url"
+                    checked={videoSourceType === "url"}
+                    onChange={() => setVideoSourceType("url")}
+                    className="text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5 border-white/10"
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Video URL</span>
+                </label>
               </div>
+
+              {videoSourceType === "file" ? (
+                <div className="space-y-4">
+                  <div className="relative border-2 border-dashed border-white/10 rounded-xl p-6 bg-white/2 hover:bg-white/5 transition-all text-center flex flex-col items-center justify-center cursor-pointer">
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <FiUpload className="h-8 w-8 text-[#e50914] mb-3" />
+                    <p className="text-sm font-bold text-gray-300">
+                      {videoFile ? videoFile.name : isEditMode ? "Click to upload a new video file replacement" : "Select video file"}
+                    </p>
+                    <p className="text-xs text-gray-500 mt-1">Supports raw video formats (MP4, MKV, etc.) uploaded directly to R2.</p>
+                  </div>
+
+                  {videoFile && (
+                    <div className="flex flex-col gap-3 p-4 bg-white/5 rounded-xl border border-white/5 text-left">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-gray-400 font-semibold truncate max-w-[200px]">Selected: {videoFile.name}</span>
+                        {uploadStatus === "uploading" && (
+                          <span className="text-red-500 font-bold animate-pulse">Uploading {uploadProgress}%</span>
+                        )}
+                        {uploadStatus === "success" && (
+                          <span className="text-emerald-500 font-bold">✓ Video uploaded successfully</span>
+                        )}
+                        {uploadStatus === "failed" && (
+                          <span className="text-red-500 font-bold">✗ Upload failed</span>
+                        )}
+                      </div>
+
+                      {uploadStatus === "uploading" && (
+                        <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+                          <div className="bg-red-500 h-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+                        </div>
+                      )}
+
+                      {uploadStatus !== "success" && (
+                        <button
+                          type="button"
+                          disabled={uploadStatus === "uploading"}
+                          onClick={handleDirectUpload}
+                          className="w-full py-2.5 rounded-lg bg-red-600 hover:bg-red-700 disabled:bg-gray-700 text-white text-xs font-bold transition-all cursor-pointer"
+                        >
+                          {uploadStatus === "uploading" ? "Uploading to Cloudflare R2..." : "Upload Video"}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div>
+                  <input
+                    type="text"
+                    placeholder="e.g. https://my-bucket.r2.dev/movies/movie.mp4"
+                    value={videoUrlInput}
+                    onChange={(e) => setVideoUrlInput(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-white/5 bg-white/5 text-sm text-white outline-none focus:border-red-500/40 focus:bg-white/10 transition-all font-semibold animate-fadeIn"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Genres Multiple Choices checkboxes */}
