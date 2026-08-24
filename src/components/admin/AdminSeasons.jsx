@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { 
   FiChevronLeft, FiPlus, FiFolder, FiTv, FiArrowRight 
 } from "react-icons/fi";
@@ -9,6 +9,7 @@ import { getTvShowById, getSeasons } from "../../services/apiService";
 export default function AdminSeasons() {
   const { currentUser } = useAuth();
   const { id } = useParams();
+  const navigate = useNavigate();
   const [tvShow, setTvShow] = useState(null);
   const [seasons, setSeasons] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,7 @@ export default function AdminSeasons() {
     // So adding a season simply points to the episodes creation router.
     setNewSeasonNumber("");
     setError("");
-    window.location.hash = `/admin/tv-shows/${id}/seasons/${sNum}/episodes`;
+    navigate(`/admin/tv-shows/${id}/seasons/${sNum}/episodes`);
   };
 
   if (loading) {
