@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FiPlay, FiInfo, FiPlus, FiChevronRight, FiSearch, FiX } from "react-icons/fi";
+import { FiPlay, FiInfo, FiPlus, FiChevronRight, FiChevronLeft, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { 
   getMovies, 
@@ -13,6 +13,29 @@ import {
   searchTmdb
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
+
+// Static mapping of TMDB genre IDs to human-readable names
+const TMDB_GENRES = {
+  28: "Action",
+  12: "Adventure",
+  16: "Animation",
+  35: "Comedy",
+  80: "Crime",
+  99: "Documentary",
+  18: "Drama",
+  10751: "Family",
+  14: "Fantasy",
+  36: "History",
+  27: "Horror",
+  10402: "Music",
+  9648: "Mystery",
+  10749: "Romance",
+  878: "Sci-Fi",
+  10770: "TV Movie",
+  53: "Thriller",
+  10752: "War",
+  37: "Western"
+};
 
 export default function Home() {
   const { currentUser } = useAuth();
@@ -33,6 +56,19 @@ export default function Home() {
   const [tmdbError, setTmdbError] = useState(false);
   const [tmdbSearchResults, setTmdbSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [tmdbLoading, setTmdbLoading] = useState(true);
+
+  // TMDB Hero carousel states
+  const [heroIndex, setHeroIndex] = useState(0);
+
+  // Automatic rotation for TMDB hero banner (resets on manual changes)
+  useEffect(() => {
+    if (tmdbTrending.length === 0) return;
+    const interval = setInterval(() => {
+      setHeroIndex((prevIndex) => (prevIndex + 1) % Math.min(tmdbTrending.length, 6));
+    }, 6000); // 6 seconds auto-rotation
+    return () => clearInterval(interval);
+  }, [tmdbTrending, heroIndex]);
 
   useEffect(() => {
     async function loadCatalog() {
@@ -81,6 +117,7 @@ export default function Home() {
         setError("Could not load catalog. Please check your connection.");
       } finally {
         setLoading(false);
+        setTmdbLoading(false);
       }
     }
 
@@ -148,8 +185,124 @@ export default function Home() {
   return (
     <div className="relative min-h-screen bg-[#0d0e12] pb-24 text-white overflow-x-hidden">
       {/* Hero Banner Section */}
-      {featuredMovie ? (
-        <div className="relative h-[85vh] w-full overflow-hidden">
+      {tmdbLoading ? (
+        <div className="relative h-[500px] md:h-[600px] w-full bg-gradient-to-tr from-[#12131a] to-[#0d0e12] animate-pulse flex flex-col justify-end p-8 md:p-16">
+          <div className="max-w-2xl space-y-4 text-left">
+            <div className="h-4 w-24 bg-white/10 rounded"></div>
+            <div className="h-12 w-3/4 bg-white/10 rounded"></div>
+            <div className="h-6 w-1/2 bg-white/10 rounded"></div>
+            <div className="h-20 w-full bg-white/10 rounded"></div>
+            <div className="flex gap-4">
+              <div className="h-12 w-32 bg-white/10 rounded-xl"></div>
+              <div className="h-12 w-32 bg-white/10 rounded-xl"></div>
+            </div>
+          </div>
+        </div>
+      ) : tmdbTrending.length > 0 ? (
+        (() => {
+          const heroMovies = tmdbTrending.slice(0, 6);
+          const activeMovie = heroMovies[heroIndex] || heroMovies[0];
+          return (
+            <div className="relative h-[500px] md:h-[600px] w-full overflow-hidden group">
+              {/* Background Image / Backdrop */}
+              <div className="absolute inset-0 transition-transform duration-1000 transform scale-100 group-hover:scale-102">
+                <img
+                  src={`https://image.tmdb.org/t/p/original${activeMovie.backdrop_path || activeMovie.poster_path}`}
+                  alt={activeMovie.title || activeMovie.name}
+                  className="h-full w-full object-cover object-center"
+                />
+                {/* Gradient overlays to blend with background */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0d0e12] via-[#0d0e12]/60 to-transparent"></div>
+                <div className="absolute inset-0 bg-gradient-to-r from-[#0d0e12] via-[#0d0e12]/40 to-transparent"></div>
+                <div className="absolute inset-0 bg-black/20"></div>
+              </div>
+
+              {/* Slider Navigation Arrows */}
+              <button
+                onClick={() => setHeroIndex((prev) => (prev - 1 + heroMovies.length) % heroMovies.length)}
+                className="absolute left-4 top-1/2 transform -translate-y-1/2 z-20 p-2.5 rounded-full bg-black/40 hover:bg-black/80 border border-white/5 text-white hover:text-[#e50914] opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer"
+              >
+                <FiChevronLeft className="h-6 w-6" />
+              </button>
+              <button
+                onClick={() => setHeroIndex((prev) => (prev + 1) % heroMovies.length)}
+                className="absolute right-4 top-1/2 transform -translate-y-1/2 z-20 p-2.5 rounded-full bg-black/40 hover:bg-black/80 border border-white/5 text-white hover:text-[#e50914] opacity-0 group-hover:opacity-100 transition-all duration-300 cursor-pointer"
+              >
+                <FiChevronRight className="h-6 w-6" />
+              </button>
+
+              {/* Hero Content */}
+              <div className="absolute bottom-16 left-0 right-0 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 z-10 text-left">
+                <div className="max-w-2xl">
+                  {/* Badge & Meta Row */}
+                  <div className="flex flex-wrap items-center gap-3 mb-3 text-xs md:text-sm font-semibold">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-md bg-[#e50914] text-white font-extrabold text-[10px] uppercase tracking-widest">
+                      Trending
+                    </span>
+                    <span className="text-gray-300">
+                      {(activeMovie.release_date || activeMovie.first_air_date || "").split("-")[0]}
+                    </span>
+                    <span className="text-amber-500 flex items-center gap-1 font-bold">
+                      ⭐ {activeMovie.vote_average ? activeMovie.vote_average.toFixed(1) : "N/A"}
+                    </span>
+                    {activeMovie.genre_ids && activeMovie.genre_ids.length > 0 && (
+                      <span className="text-gray-400 font-light border-l border-white/10 pl-3">
+                        {activeMovie.genre_ids.slice(0, 3).map(id => TMDB_GENRES[id]).filter(Boolean).join(" • ")}
+                      </span>
+                    )}
+                  </div>
+
+                  <h1 className="text-3xl sm:text-5xl md:text-6xl font-black tracking-tight text-white uppercase leading-tight mb-4 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+                    {activeMovie.title || activeMovie.name}
+                  </h1>
+                  <p className="text-gray-300 text-xs sm:text-sm md:text-base mb-8 leading-relaxed font-light line-clamp-3 md:line-clamp-4 drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">
+                    {activeMovie.overview}
+                  </p>
+
+                  {/* Action Buttons */}
+                  <div className="flex flex-wrap gap-4">
+                    <button
+                      onClick={() => {
+                        const localMatch = movies.find(m => m.tmdbId === activeMovie.id || m.title?.toLowerCase() === (activeMovie.title || activeMovie.name)?.toLowerCase());
+                        if (localMatch) {
+                          navigate(`/watch/${localMatch.id}`);
+                        } else {
+                          navigate(`/movie/tmdb-movie-${activeMovie.id}`);
+                        }
+                      }}
+                      className="flex items-center gap-2.5 px-8 py-3.5 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_20px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_25px_rgba(229,9,20,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-sm"
+                    >
+                      <FiPlay className="h-4.5 w-4.5 fill-current" />
+                      Watch Now
+                    </button>
+                    <button
+                      onClick={() => navigate(`/movie/tmdb-movie-${activeMovie.id}`)}
+                      className="flex items-center gap-2 px-8 py-3.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-sm"
+                    >
+                      <FiInfo className="h-5 w-5" />
+                      More Info
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Dot Indicators */}
+              <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-2 z-25">
+                {heroMovies.map((_, idx) => (
+                  <button
+                    key={`indicator-${idx}`}
+                    onClick={() => setHeroIndex(idx)}
+                    className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
+                      heroIndex === idx ? "w-6 bg-[#e50914]" : "w-1.5 bg-white/30 hover:bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+          );
+        })()
+      ) : featuredMovie ? (
+        <div className="relative h-[500px] md:h-[600px] w-full overflow-hidden">
           {/* Background Image / Backdrop */}
           <div className="absolute inset-0">
             <img
@@ -558,8 +711,8 @@ export default function Home() {
             {/* ================= TMDB SECTION ================= */}
             <div className="border-t border-white/5 pt-12 space-y-12">
               <div className="flex items-center gap-3 pl-1">
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500 animate-pulse"></span>
-                <h3 className="text-2xl font-black tracking-widest text-white uppercase">GLOBAL TMDB CATALOG</h3>
+                <span className="h-2.5 w-2.5 rounded-full bg-[#e50914] animate-pulse"></span>
+                <h3 className="text-2xl font-black tracking-widest text-white uppercase">TMDB PICKS</h3>
               </div>
 
               {tmdbError ? (
