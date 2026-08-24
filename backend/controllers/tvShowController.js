@@ -269,6 +269,26 @@ export async function getSeasons(req, res) {
   try {
     const db = getDb();
     const tvShowId = parseInt(id);
+
+    // Verify TV show exists and check publish status permissions
+    const tvShow = await db.collection("tvshows").findOne({ id: tvShowId });
+    if (!tvShow) {
+      return res.status(404).json({ success: false, message: "TV Show not found." });
+    }
+
+    if (!tvShow.isPublished) {
+      let isAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        if (user && user.role === "admin") {
+          isAuthorized = true;
+        }
+      }
+      if (!isAuthorized) {
+        return res.status(403).json({ success: false, message: "Forbidden. Access to unpublished media restricted." });
+      }
+    }
+
     const episodes = await db.collection("episodes").find({ tvShowId }).toArray();
 
     // Group by season number
@@ -309,6 +329,25 @@ export async function getEpisodes(req, res) {
     const tvShowId = parseInt(id);
     const sNum = parseInt(seasonNumber);
 
+    // Verify TV show exists and check publish status permissions
+    const tvShow = await db.collection("tvshows").findOne({ id: tvShowId });
+    if (!tvShow) {
+      return res.status(404).json({ success: false, message: "TV Show not found." });
+    }
+
+    if (!tvShow.isPublished) {
+      let isAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        if (user && user.role === "admin") {
+          isAuthorized = true;
+        }
+      }
+      if (!isAuthorized) {
+        return res.status(403).json({ success: false, message: "Forbidden. Access to unpublished media restricted." });
+      }
+    }
+
     let whereClause = { tvShowId, seasonNumber: sNum, isPublished: true };
 
     if (adminView === "true" && req.user?.firebaseUid) {
@@ -340,6 +379,25 @@ export async function getEpisodeById(req, res) {
     const tvShowId = parseInt(id);
     const sNum = parseInt(seasonNumber);
     const epNum = parseInt(episodeNumber);
+
+    // Verify TV show exists and check publish status permissions
+    const tvShow = await db.collection("tvshows").findOne({ id: tvShowId });
+    if (!tvShow) {
+      return res.status(404).json({ success: false, message: "TV Show not found." });
+    }
+
+    if (!tvShow.isPublished) {
+      let isAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        if (user && user.role === "admin") {
+          isAuthorized = true;
+        }
+      }
+      if (!isAuthorized) {
+        return res.status(403).json({ success: false, message: "Forbidden. Access to unpublished media restricted." });
+      }
+    }
 
     const episode = await db.collection("episodes").findOne({ tvShowId, seasonNumber: sNum, episodeNumber: epNum });
 

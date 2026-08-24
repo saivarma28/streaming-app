@@ -17,6 +17,8 @@ import VideoPlayerPage from "../pages/VideoPlayerPage";
 import AdminDashboard from "../pages/AdminDashboard";
 import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
+import Movies from "../pages/Movies";
+import TvShows from "../pages/TvShows";
 
 // High-fidelity premium placeholders for secondary routes
 const Placeholder = ({ title }) => (
@@ -151,8 +153,22 @@ export default function AppRoutes() {
       />
 
       {/* Other placeholders (Public/Standard for now) */}
-      <Route path="/tv-shows" element={<Placeholder title="TV Shows" />} />
-      <Route path="/movies" element={<Placeholder title="Movies" />} />
+      <Route
+        path="/tv-shows"
+        element={
+          <ProtectedRoute>
+            <TvShows />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/movies"
+        element={
+          <ProtectedRoute>
+            <Movies />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/new-popular" element={<Placeholder title="New & Popular" />} />
       <Route path="/my-list" element={<Placeholder title="My List" />} />
       <Route path="*" element={<Placeholder title="404 - Not Found" />} />

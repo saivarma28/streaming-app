@@ -733,6 +733,21 @@ export async function deleteEpisode(token, tvShowId, seasonNumber, episodeId) {
   }
 }
 
+export async function getEpisodeById(token, tvShowId, seasonNumber, episodeNumber) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons/${seasonNumber}/episodes/${episodeNumber}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to fetch episode details.");
+    return data;
+  } catch (error) {
+    console.error("getEpisodeById API Error:", error.message);
+    throw error;
+  }
+}
+
 
 
 

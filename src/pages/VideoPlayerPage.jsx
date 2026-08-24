@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FiArrowLeft, FiAlertCircle } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
-import { getMovieById, updateWatchHistory } from "../services/apiService";
+import { getMovieById, updateWatchHistory, getEpisodeById } from "../services/apiService";
 import VideoPlayer from "../components/VideoPlayer";
 
 export default function VideoPlayerPage() {
@@ -23,13 +23,37 @@ export default function VideoPlayerPage() {
       try {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
-        const movieData = await getMovieById(token, id);
         
-        if (!movieData.movie.hlsUrl) {
-          throw new Error("This movie has no streaming content associated.");
+        let mediaData;
+        if (id.startsWith("tv-")) {
+          // TV Show episode: tv-${tvShowId}-s${seasonNumber}-e${episodeNumber}
+          const match = id.match(/^tv-(\d+)-s(\d+)-e(\d+)$/);
+          if (!match) {
+            throw new Error("Invalid TV episode format.");
+          }
+          const [_, tvShowId, seasonNum, epNum] = match;
+          
+          const epData = await getEpisodeById(token, tvShowId, seasonNum, epNum);
+          const episode = epData.episode;
+          
+          mediaData = {
+            id: id,
+            title: `Season ${episode.seasonNumber} Ep ${episode.episodeNumber} - ${episode.title}`,
+            hlsUrl: episode.hlsUrl,
+            transcodingStatus: episode.transcodingStatus || "READY",
+            duration: episode.duration
+          };
+        } else {
+          // Standard movie
+          const movieData = await getMovieById(token, id);
+          mediaData = movieData.movie;
         }
         
-        setMovie(movieData.movie);
+        if (!mediaData.hlsUrl) {
+          throw new Error("This media has no streaming content associated.");
+        }
+        
+        setMovie(mediaData);
       } catch (err) {
         console.error("Failed to load movie for watch session:", err);
         setError(err.message || "Failed to launch streaming playback.");
@@ -64,6 +88,25 @@ export default function VideoPlayerPage() {
       console.warn("Failed to mark movie as completed in watch history:", err.message);
     }
     // Navigate back to details screen
+    if (id.startsWith("tv-")) {
+      const match = id.match(/^tv-(\d+)-s\d+-e\d+$/);
+      if (match) {
+        navigate(`/movie/tv-${match[1]}`);
+      } else {
+        navigate(-1);
+      }
+    } else {
+      navigate(`/movie/${id}`);
+    }
+  };
+
+  const handleBackClick = () => {
+    if (id.startsWith("tv-")) {
+      const match = id.match(/^tv-(\d+)-s\d+-e\d+$/);
+      if (match) {
+        return navigate(`/movie/tv-${match[1]}`);
+      }
+    }
     navigate(`/movie/${id}`);
   };
 
@@ -86,10 +129,10 @@ export default function VideoPlayerPage() {
             {error || "Could not launch streaming session."}
           </p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBackClick}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-colors cursor-pointer border border-white/10"
           >
-            <FiArrowLeft className="h-4 w-4" /> Back to Movie Details
+            <FiArrowLeft className="h-4 w-4" /> Back to Details
           </button>
         </div>
       </div>
@@ -119,10 +162,10 @@ export default function VideoPlayerPage() {
             {statusMessage}
           </p>
           <button
-            onClick={() => navigate(-1)}
+            onClick={handleBackClick}
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-colors cursor-pointer border border-white/10"
           >
-            <FiArrowLeft className="h-4 w-4" /> Back to Movie Details
+            <FiArrowLeft className="h-4 w-4" /> Back to Details
           </button>
         </div>
       </div>
@@ -134,7 +177,7 @@ export default function VideoPlayerPage() {
       {/* Floating Header Controls */}
       <div className="absolute top-0 left-0 right-0 z-30 p-6 bg-gradient-to-b from-black/80 to-transparent flex items-center gap-4 opacity-0 hover:opacity-100 transition-opacity duration-300">
         <button
-          onClick={() => navigate(`/movie/${id}`)}
+          onClick={handleBackClick}
           className="p-3 rounded-full bg-black/60 hover:bg-black/80 border border-white/10 text-white hover:text-red-500 transition-all cursor-pointer"
         >
           <FiArrowLeft className="h-5 w-5" />
