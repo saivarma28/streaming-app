@@ -56,11 +56,12 @@ export default function Home() {
 
         // Load TMDB catalog blocks in parallel (fail-safe error isolation)
         try {
+          let hasTmdbError = false;
           const [trendingData, popularData, topRatedData, popularTvData] = await Promise.all([
-            getTmdbTrendingMovies(token).catch(e => { console.warn("TMDB trending load error:", e.message); return { results: [] }; }),
-            getTmdbPopularMovies(token).catch(e => { console.warn("TMDB popular load error:", e.message); return { results: [] }; }),
-            getTmdbTopRatedMovies(token).catch(e => { console.warn("TMDB top rated load error:", e.message); return { results: [] }; }),
-            getTmdbPopularTv(token).catch(e => { console.warn("TMDB popular TV load error:", e.message); return { results: [] }; })
+            getTmdbTrendingMovies(token).catch(e => { console.warn("TMDB trending load error:", e.message); hasTmdbError = true; return { results: [] }; }),
+            getTmdbPopularMovies(token).catch(e => { console.warn("TMDB popular load error:", e.message); hasTmdbError = true; return { results: [] }; }),
+            getTmdbTopRatedMovies(token).catch(e => { console.warn("TMDB top rated load error:", e.message); hasTmdbError = true; return { results: [] }; }),
+            getTmdbPopularTv(token).catch(e => { console.warn("TMDB popular TV load error:", e.message); hasTmdbError = true; return { results: [] }; })
           ]);
           
           setTmdbTrending(trendingData.results || []);
@@ -68,7 +69,7 @@ export default function Home() {
           setTmdbTopRated(topRatedData.results || []);
           setTmdbPopularTv(popularTvData.results || []);
           
-          if (!trendingData.results && !popularData.results && !topRatedData.results && !popularTvData.results) {
+          if (hasTmdbError || (!trendingData.results && !popularData.results && !topRatedData.results && !popularTvData.results)) {
             setTmdbError(true);
           }
         } catch (tmdbErr) {
