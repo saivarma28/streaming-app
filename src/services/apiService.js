@@ -563,6 +563,176 @@ export async function getTmdbTvDetails(token, id) {
   return tmdbFetch(token, `/tv/${id}`);
 }
 
+// ==========================================
+// TV SHOW CATALOG SERVICES
+// ==========================================
+
+export async function getTvShows(token, genreId = null, adminView = false) {
+  try {
+    let url = `${BACKEND_URL}/api/tvshows?adminView=${adminView}`;
+    if (genreId) url += `&genreId=${genreId}`;
+    const response = await fetch(url, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to fetch TV shows.");
+    return data;
+  } catch (error) {
+    console.error("getTvShows API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function getTvShowById(token, id) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${id}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to fetch TV show details.");
+    return data;
+  } catch (error) {
+    console.error("getTvShowById API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function createTvShow(token, tvShowData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(tvShowData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to create TV show.");
+    return data;
+  } catch (error) {
+    console.error("createTvShow API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function updateTvShow(token, id, tvShowData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${id}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(tvShowData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to update TV show.");
+    return data;
+  } catch (error) {
+    console.error("updateTvShow API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function deleteTvShow(token, id) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${id}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to delete TV show.");
+    return data;
+  } catch (error) {
+    console.error("deleteTvShow API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function getSeasons(token, tvShowId) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to fetch seasons.");
+    return data;
+  } catch (error) {
+    console.error("getSeasons API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function getEpisodes(token, tvShowId, seasonNumber, adminView = false) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons/${seasonNumber}/episodes?adminView=${adminView}`, {
+      method: "GET",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to fetch episodes.");
+    return data;
+  } catch (error) {
+    console.error("getEpisodes API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function createEpisode(token, tvShowId, seasonNumber, formData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons/${seasonNumber}/episodes`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to create episode.");
+    return data;
+  } catch (error) {
+    console.error("createEpisode API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function updateEpisode(token, tvShowId, seasonNumber, episodeId, formData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons/${seasonNumber}/episodes/${episodeId}`, {
+      method: "PUT",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      },
+      body: formData
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to update episode.");
+    return data;
+  } catch (error) {
+    console.error("updateEpisode API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function deleteEpisode(token, tvShowId, seasonNumber, episodeId) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/tvshows/${tvShowId}/seasons/${seasonNumber}/episodes/${episodeId}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to delete episode.");
+    return data;
+  } catch (error) {
+    console.error("deleteEpisode API Error:", error.message);
+    throw error;
+  }
+}
+
 
 
 

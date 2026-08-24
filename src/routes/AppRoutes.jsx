@@ -70,7 +70,7 @@ export default function AppRoutes() {
         }
       />
       <Route
-        path="/admin"
+        path="/admin/*"
         element={
           <ProtectedRoute adminOnly>
             <AdminDashboard />

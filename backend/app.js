@@ -11,6 +11,7 @@ import movieRoutes from "./routes/movieRoutes.js";
 import genreRoutes from "./routes/genreRoutes.js";
 import watchHistoryRoutes from "./routes/watchHistoryRoutes.js";
 import tmdbRoutes from "./routes/tmdbRoutes.js";
+import tvShowRoutes from "./routes/tvShowRoutes.js";
 
 dotenv.config();
 
@@ -110,5 +111,8 @@ app.use("/api/watch-history", watchHistoryRoutes);
 
 // 7. TMDB catalog routes
 app.use("/api/tmdb", tmdbRoutes);
+
+// 8. TV Show catalog routes
+app.use("/api/tvshows", tvShowRoutes);
 
 export default app;
