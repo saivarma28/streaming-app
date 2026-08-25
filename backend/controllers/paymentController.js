@@ -1,6 +1,7 @@
 import razorpay from "../services/razorpayService.js";
 import { getDb } from "../config/mongodb.js";
 import crypto from "crypto";
+import { sendPaymentReceiptEmail } from "../services/emailService.js";
 
 /**
  * Creates a new Razorpay order for the premium subscription (₹99 = 9900 paise).
@@ -177,6 +178,30 @@ export async function verifyPayment(req, res) {
       status: "success",
       createdAt: new Date()
     });
+
+    // Send payment receipt email (Requirement 6 & 7)
+    try {
+      const paymentDateFormatted = premiumStartDate.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+      const expiryDateFormatted = premiumExpiryDate.toLocaleDateString("en-IN", {
+        day: "numeric",
+        month: "long",
+        year: "numeric"
+      });
+
+      await sendPaymentReceiptEmail(user.email, user.name || "Subscriber", {
+        paymentId: razorpay_payment_id,
+        orderId: razorpay_order_id,
+        paymentDate: paymentDateFormatted,
+        expiryDate: expiryDateFormatted
+      });
+      console.log(`SUCCESS: Payment receipt email sent to ${user.email}`);
+    } catch (emailError) {
+      console.error("WARNING: Failed to send payment receipt email:", emailError.message);
+    }
 
     console.log(`Payment success: Upgraded user ${firebaseUid} to Premium. Payment ID: ${razorpay_payment_id}`);
 
