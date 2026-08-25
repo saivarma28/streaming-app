@@ -43,7 +43,8 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:5174",
   "http://localhost:5175",
-  "https://streaming-app-ten-opal.vercel.app"
+  "https://streaming-app-ten-opal.vercel.app",
+  "https://streaming-app-p8u7.vercel.app"
 ];
 
 app.use(
