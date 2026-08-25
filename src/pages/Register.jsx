@@ -23,6 +23,7 @@ export default function Register() {
 
   // Dynamic helper: Detect if the input is an email (contains letters or @) or phone (digits only)
   const isEmail = /[a-zA-Z]/.test(emailOrPhone) || emailOrPhone.includes("@");
+  const isEmailInput = emailOrPhone === "" || isEmail;
 
   const handleRegisterSubmit = async (e) => {
     e.preventDefault();
@@ -72,15 +73,18 @@ export default function Register() {
       }
     } else {
       // Phone registration path
-      const phoneRegex = /^\+[1-9]\d{1,14}$/;
-      if (!phoneRegex.test(emailOrPhone)) {
-        return setError("Phone number must include country code (e.g. +919876543210).");
+      // Accept exactly 10 digits (Requirement 5)
+      if (emailOrPhone.length !== 10) {
+        return setError("Please enter a valid 10-digit mobile number.");
       }
+
+      // Prepend +91 internally
+      const fullPhoneNumber = `+91${emailOrPhone}`;
 
       // Save registration state temporarily in sessionStorage
       sessionStorage.setItem(
         "temp_reg_phone",
-        JSON.stringify({ fullName, phoneNumber: emailOrPhone })
+        JSON.stringify({ fullName, phoneNumber: fullPhoneNumber })
       );
 
       // Redirect to Phone Verification screen directly
@@ -165,20 +169,46 @@ export default function Register() {
             <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
               Email or Mobile Number
             </label>
-            <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 pointer-events-none">
-                {isEmail ? <FiMail className="h-4.5 w-4.5" /> : <FiPhone className="h-4.5 w-4.5" />}
-              </span>
-              <input
-                type="text"
-                required
-                disabled={loading}
-                placeholder="Email or Mobile Number"
-                value={emailOrPhone}
-                onChange={(e) => setEmailOrPhone(e.target.value)}
-                className="w-full rounded-xl border border-white/5 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-red-500/40 focus:bg-white/10 focus:ring-1 focus:ring-red-500/40 outline-none disabled:opacity-50"
-              />
-            </div>
+            {isEmailInput ? (
+              <div className="relative">
+                <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 pointer-events-none">
+                  <FiMail className="h-4.5 w-4.5" />
+                </span>
+                <input
+                  type="text"
+                  required
+                  disabled={loading}
+                  placeholder="Email or Mobile Number"
+                  value={emailOrPhone}
+                  onChange={(e) => setEmailOrPhone(e.target.value)}
+                  className="w-full rounded-xl border border-white/5 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-red-500/40 focus:bg-white/10 focus:ring-1 focus:ring-red-500/40 outline-none disabled:opacity-50"
+                />
+              </div>
+            ) : (
+              <div className="flex gap-0 items-center rounded-xl border border-white/5 bg-white/5 overflow-hidden transition-all duration-300 focus-within:border-red-500/40 focus-within:bg-white/10 focus-within:ring-1 focus-within:ring-red-500/40">
+                {/* Non-editable prefix */}
+                <div className="flex items-center justify-center px-3.5 bg-white/5 border-r border-white/5 text-gray-400 font-bold text-sm select-none h-11 shrink-0">
+                  <FiPhone className="h-4 w-4 mr-1.5 text-gray-500" />
+                  <span>+91</span>
+                </div>
+                {/* 10-digit input field */}
+                <input
+                  type="text"
+                  required
+                  disabled={loading}
+                  placeholder="9876543210"
+                  value={emailOrPhone}
+                  onChange={(e) => {
+                    // Enforce digits only, max 10 chars
+                    const val = e.target.value.replace(/\D/g, "");
+                    if (val.length <= 10) {
+                      setEmailOrPhone(val);
+                    }
+                  }}
+                  className="w-full bg-transparent py-3 px-4 text-sm text-white placeholder-gray-500 outline-none disabled:opacity-50"
+                />
+              </div>
+            )}
           </div>
 
           {/* Conditionally show Password inputs if email registration is detected */}

@@ -32,6 +32,7 @@ export default function Login() {
 
   // Dynamic helper: Detect if the input is an email (contains letters or @) or phone (digits only)
   const isEmail = /[a-zA-Z]/.test(identifier) || identifier.includes("@");
+  const isEmailInput = identifier === "" || isEmail;
 
   // Cleanup reCAPTCHA on unmount
   useEffect(() => {
@@ -96,10 +97,13 @@ export default function Login() {
       }
     } else {
       // Phone Login (OTP SMS dispatch)
-      const phoneRegex = /^\+[1-9]\d{1,14}$/;
-      if (!phoneRegex.test(identifier)) {
-        return setError("Phone number must include country code (e.g. +919876543210).");
+      // Accept exactly 10 digits (Requirement 5)
+      if (identifier.length !== 10) {
+        return setError("Please enter a valid 10-digit mobile number.");
       }
+
+      // Prepend +91 internally
+      const fullPhoneNumber = `+91${identifier}`;
 
       try {
         setLoading(true);
@@ -112,7 +116,7 @@ export default function Login() {
           });
         }
 
-        const confirmationResult = await signInWithPhone(identifier, recaptchaVerifierRef.current);
+        const confirmationResult = await signInWithPhone(fullPhoneNumber, recaptchaVerifierRef.current);
         confirmationResultRef.current = confirmationResult;
 
         setMessage("SMS OTP code sent successfully to your mobile number!");
@@ -227,20 +231,46 @@ export default function Login() {
                 <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
                   Email or Mobile Number
                 </label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 pointer-events-none">
-                    {isEmail ? <FiMail className="h-4.5 w-4.5" /> : <FiPhone className="h-4.5 w-4.5" />}
-                  </span>
-                  <input
-                    type="text"
-                    required
-                    disabled={loading}
-                    placeholder="Email or Mobile Number"
-                    value={identifier}
-                    onChange={(e) => setIdentifier(e.target.value)}
-                    className="w-full rounded-xl border border-white/5 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-red-500/40 focus:bg-white/10 focus:ring-1 focus:ring-red-500/40 outline-none disabled:opacity-50"
-                  />
-                </div>
+                {isEmailInput ? (
+                  <div className="relative">
+                    <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-500 pointer-events-none">
+                      <FiMail className="h-4.5 w-4.5" />
+                    </span>
+                    <input
+                      type="text"
+                      required
+                      disabled={loading}
+                      placeholder="Email or Mobile Number"
+                      value={identifier}
+                      onChange={(e) => setIdentifier(e.target.value)}
+                      className="w-full rounded-xl border border-white/5 bg-white/5 py-3 pl-11 pr-4 text-sm text-white placeholder-gray-500 transition-all duration-300 focus:border-red-500/40 focus:bg-white/10 focus:ring-1 focus:ring-red-500/40 outline-none disabled:opacity-50"
+                    />
+                  </div>
+                ) : (
+                  <div className="flex gap-0 items-center rounded-xl border border-white/5 bg-white/5 overflow-hidden transition-all duration-300 focus-within:border-red-500/40 focus-within:bg-white/10 focus-within:ring-1 focus-within:ring-red-500/40">
+                    {/* Non-editable prefix */}
+                    <div className="flex items-center justify-center px-3.5 bg-white/5 border-r border-white/5 text-gray-400 font-bold text-sm select-none h-11 shrink-0">
+                      <FiPhone className="h-4 w-4 mr-1.5 text-gray-500" />
+                      <span>+91</span>
+                    </div>
+                    {/* 10-digit input field */}
+                    <input
+                      type="text"
+                      required
+                      disabled={loading}
+                      placeholder="9876543210"
+                      value={identifier}
+                      onChange={(e) => {
+                        // Enforce digits only, max 10 chars
+                        const val = e.target.value.replace(/\D/g, "");
+                        if (val.length <= 10) {
+                          setIdentifier(val);
+                        }
+                      }}
+                      className="w-full bg-transparent py-3 px-4 text-sm text-white placeholder-gray-500 outline-none disabled:opacity-50"
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Conditionally show Password input if dynamic input is detected as Email */}
