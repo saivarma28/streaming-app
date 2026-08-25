@@ -489,27 +489,46 @@ export default function AdminMovieForm() {
               </div>
             </div>
 
-            {/* Toggles */}
-            <div className="flex gap-6 pt-2">
-              <label className="flex items-center gap-2.5 select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={movieForm.isPremium}
-                  onChange={(e) => setMovieForm({ ...movieForm, isPremium: e.target.checked })}
-                  className="rounded border-white/10 text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5"
-                />
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Premium Title</span>
-              </label>
+            {/* Content Type & Publish */}
+            <div className="space-y-4 pt-2">
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">Content Type</label>
+                <div className="flex gap-6">
+                  <label className="flex items-center gap-2 select-none cursor-pointer text-xs font-semibold text-gray-300">
+                    <input
+                      type="radio"
+                      name="contentType"
+                      checked={!movieForm.isPremium}
+                      onChange={() => setMovieForm({ ...movieForm, isPremium: false })}
+                      className="border-white/10 text-[#e50914] focus:ring-0 focus:ring-offset-0 bg-white/5"
+                    />
+                    <span>Normal</span>
+                  </label>
 
-              <label className="flex items-center gap-2.5 select-none cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={movieForm.isPublished}
-                  onChange={(e) => setMovieForm({ ...movieForm, isPublished: e.target.checked })}
-                  className="rounded border-white/10 text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5"
-                />
-                <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Publish Immediately</span>
-              </label>
+                  <label className="flex items-center gap-2 select-none cursor-pointer text-xs font-semibold text-gray-300">
+                    <input
+                      type="radio"
+                      name="contentType"
+                      checked={movieForm.isPremium}
+                      onChange={() => setMovieForm({ ...movieForm, isPremium: true })}
+                      className="border-white/10 text-amber-500 focus:ring-0 focus:ring-offset-0 bg-white/5"
+                    />
+                    <span className="text-amber-400 font-bold flex items-center gap-0.5">Premium ⭐</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="flex items-center gap-2.5 select-none cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={movieForm.isPublished}
+                    onChange={(e) => setMovieForm({ ...movieForm, isPublished: e.target.checked })}
+                    className="rounded border-white/10 text-red-600 focus:ring-0 focus:ring-offset-0 bg-white/5"
+                  />
+                  <span className="text-xs font-bold uppercase tracking-wider text-gray-300">Publish Immediately</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>

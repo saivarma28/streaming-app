@@ -232,7 +232,7 @@ export default function Movies() {
                       <div className="flex items-center justify-between mb-1.5">
                         {movie.isPremium && (
                           <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                            Premium
+                            ⭐ PREMIUM
                           </span>
                         )}
                         <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
@@ -284,7 +284,7 @@ export default function Movies() {
                           <div className="flex items-center justify-between mb-1.5">
                             {movie.isPremium && (
                               <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                                Premium
+                                ⭐ PREMIUM
                               </span>
                             )}
                             <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
@@ -332,7 +332,7 @@ export default function Movies() {
                         <div className="flex items-center justify-between mb-1.5">
                           {movie.isPremium && (
                             <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                              Premium
+                              ⭐ PREMIUM
                             </span>
                           )}
                           <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>

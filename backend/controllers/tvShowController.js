@@ -87,6 +87,24 @@ export async function getTvShowById(req, res) {
       }
     }
 
+    // Check Premium Access restriction
+    if (tvShow.isPremium) {
+      let isPremiumAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
+        if (user && (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date()))) {
+          isPremiumAuthorized = true;
+        }
+      }
+      if (!isPremiumAuthorized) {
+        return res.status(403).json({
+          success: false,
+          message: "Premium subscription required"
+        });
+      }
+    }
+
     const genres = await db.collection("genres")
       .find({ id: { $in: tvShow.genreIds || [] } })
       .toArray();
@@ -111,6 +129,7 @@ export async function createTvShow(req, res) {
     releaseYear,
     language,
     isPublished,
+    isPremium,
     genreIds,
     tmdbId
   } = req.body;
@@ -121,6 +140,7 @@ export async function createTvShow(req, res) {
 
   const parsedReleaseYear = parseInt(releaseYear);
   const parsedIsPublished = isPublished === "true" || isPublished === true;
+  const parsedIsPremium = isPremium === "true" || isPremium === true;
   const parsedTmdbId = tmdbId ? parseInt(tmdbId) : null;
 
   let parsedGenreIds = [];
@@ -150,6 +170,7 @@ export async function createTvShow(req, res) {
       releaseYear: parsedReleaseYear,
       language: language || "English",
       isPublished: parsedIsPublished,
+      isPremium: parsedIsPremium,
       genreIds: parsedGenreIds,
       tmdbId: parsedTmdbId,
       createdAt: new Date(),
@@ -183,6 +204,7 @@ export async function updateTvShow(req, res) {
     releaseYear,
     language,
     isPublished,
+    isPremium,
     genreIds,
     tmdbId
   } = req.body;
@@ -207,6 +229,7 @@ export async function updateTvShow(req, res) {
     if (language !== undefined) updateFields.language = language;
     if (releaseYear !== undefined) updateFields.releaseYear = parseInt(releaseYear);
     if (isPublished !== undefined) updateFields.isPublished = isPublished === "true" || isPublished === true;
+    if (isPremium !== undefined) updateFields.isPremium = isPremium === "true" || isPremium === true;
     if (tmdbId !== undefined) updateFields.tmdbId = tmdbId ? parseInt(tmdbId) : null;
 
     if (genreIds !== undefined) {
@@ -398,6 +421,24 @@ export async function getEpisodeById(req, res) {
       }
       if (!isAuthorized) {
         return res.status(403).json({ success: false, message: "Forbidden. Access to unpublished media restricted." });
+      }
+    }
+
+    // Check Premium Access restriction
+    if (tvShow.isPremium) {
+      let isPremiumAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
+        if (user && (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date()))) {
+          isPremiumAuthorized = true;
+        }
+      }
+      if (!isPremiumAuthorized) {
+        return res.status(403).json({
+          success: false,
+          message: "Premium subscription required"
+        });
       }
     }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut } from "react-icons/fi";
+import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 
 export default function Navbar() {
@@ -13,7 +13,9 @@ export default function Navbar() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { currentUser, role, logout } = useAuth();
+  const { currentUser, dbUser, role, logout } = useAuth();
+  const expiry = dbUser?.premiumExpiryDate || dbUser?.subscriptionExpiryDate;
+  const isPremiumUser = dbUser && (dbUser.role === "admin" || (dbUser.isPremium === true && expiry && new Date(expiry) > new Date()));
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -104,6 +106,21 @@ export default function Navbar() {
           <div className="hidden md:flex items-center gap-5">
             {currentUser ? (
               <>
+                {isPremiumUser ? (
+                  <Link
+                    to="/premium"
+                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-[#ffb703]/10 text-[#ffb703] border border-[#ffb703]/20 uppercase tracking-widest shadow-[0_0_10px_rgba(255,183,3,0.15)] hover:scale-102 transition-transform duration-300"
+                  >
+                    <FiStar className="h-3 w-3 fill-current" /> Premium
+                  </Link>
+                ) : (
+                  <Link
+                    to="/premium"
+                    className="inline-block px-4 py-1.5 rounded-xl bg-gradient-to-r from-[#ffb703] to-[#ff8500] hover:shadow-[0_0_15px_rgba(255,133,0,0.3)] text-black text-xs font-black uppercase tracking-wider transition-all duration-300 transform hover:scale-102"
+                  >
+                    Go Premium
+                  </Link>
+                )}
                 <button className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer">
                   <FiSearch className="h-5 w-5" />
                 </button>
@@ -177,6 +194,23 @@ export default function Navbar() {
         <div className="md:hidden bg-[#090a0f] border-t border-white/5 px-4 pt-4 pb-6 space-y-3 transition-all duration-300">
           {currentUser ? (
             <>
+              {isPremiumUser ? (
+                <Link
+                  to="/premium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="mx-3 py-2 rounded-xl bg-[#ffb703]/10 border border-[#ffb703]/20 text-[#ffb703] text-xs font-black uppercase tracking-widest text-center flex items-center justify-center gap-1 hover:bg-[#ffb703]/20 transition-all duration-300"
+                >
+                  <FiStar className="h-3.5 w-3.5 fill-current" /> Premium Active
+                </Link>
+              ) : (
+                <Link
+                  to="/premium"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block text-center text-xs font-black text-black bg-gradient-to-r from-[#ffb703] to-[#ff8500] py-2.5 mx-3 rounded-xl uppercase tracking-wider shadow-md"
+                >
+                  Upgrade to Premium
+                </Link>
+              )}
               {navLinks.map((link) => (
                 <NavLink
                   key={link.name}

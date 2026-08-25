@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle, FiUser } from "react-icons/fi";
+import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle, FiUser, FiLock } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 
 export default function MovieDetails() {
   const { id } = useParams();
-  const { currentUser } = useAuth();
+  const { currentUser, dbUser } = useAuth();
+  const isPremiumUser = dbUser && (dbUser.role === "admin" || (dbUser.isPremium === true && dbUser.subscriptionExpiryDate && new Date(dbUser.subscriptionExpiryDate) > new Date()));
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -313,6 +314,23 @@ export default function MovieDetails() {
             {/* Play/Episode Catalog Action Area */}
             {movie.isTv ? (
               <div className="mt-8 space-y-6">
+                {movie.isPremium && !isPremiumUser && (
+                  <div className="flex flex-col gap-4 border border-[#ffb703]/20 bg-[#ffb703]/5 p-6 rounded-2xl max-w-md text-left mb-6">
+                    <div className="flex items-center gap-2 text-amber-500 font-bold text-lg">
+                      <FiLock className="h-5 w-5" />
+                      <span>🔒 Premium Content</span>
+                    </div>
+                    <p className="text-gray-300 text-xs font-light leading-relaxed">
+                      This TV show is available for Premium members.
+                    </p>
+                    <Link
+                      to="/premium"
+                      className="inline-flex items-center justify-center gap-1.5 px-6 py-3 rounded-xl bg-gradient-to-r from-[#ffb703] to-[#ff8500] hover:from-[#ff8500] hover:to-[#ffb703] text-black font-black text-xs uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(255,183,3,0.2)] hover:scale-[1.02] cursor-pointer"
+                    >
+                      Get Premium – ₹99
+                    </Link>
+                  </div>
+                )}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/10 pb-4">
                   <h3 className="text-xl font-bold text-white uppercase tracking-wider">Episodes</h3>
                   
@@ -364,11 +382,17 @@ export default function MovieDetails() {
                           {/* Play Hover Overlay */}
                           {ep.hlsUrl && (
                             <button
-                              onClick={() => navigate(`/watch/tv-${movie.id}-s${selectedSeason}-e${ep.episodeNumber}`)}
+                              onClick={() => {
+                                if (movie.isPremium && !isPremiumUser) {
+                                  navigate("/premium");
+                                } else {
+                                  navigate(`/watch/tv-${movie.id}-s${selectedSeason}-e${ep.episodeNumber}`);
+                                }
+                              }}
                               className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 cursor-pointer"
                             >
                               <div className="p-3 bg-[#e50914] rounded-full text-white shadow-lg transform scale-90 group-hover:scale-100 transition-transform duration-300">
-                                <FiPlay className="h-4 w-4 fill-current" />
+                                {movie.isPremium && !isPremiumUser ? <FiLock className="h-4 w-4" /> : <FiPlay className="h-4 w-4 fill-current" />}
                               </div>
                             </button>
                           )}
@@ -389,10 +413,24 @@ export default function MovieDetails() {
                           {/* Play CTA for Episode */}
                           {ep.hlsUrl ? (
                             <button
-                              onClick={() => navigate(`/watch/tv-${movie.id}-s${selectedSeason}-e${ep.episodeNumber}`)}
+                              onClick={() => {
+                                if (movie.isPremium && !isPremiumUser) {
+                                  navigate("/premium");
+                                } else {
+                                  navigate(`/watch/tv-${movie.id}-s${selectedSeason}-e${ep.episodeNumber}`);
+                                }
+                              }}
                               className="inline-flex items-center gap-1.5 self-start text-xs font-bold text-red-500 hover:text-red-400 transition-colors cursor-pointer"
                             >
-                              <FiPlay className="h-3.5 w-3.5 fill-current" /> Play Episode
+                              {movie.isPremium && !isPremiumUser ? (
+                                <>
+                                  <FiLock className="h-3.5 w-3.5" /> Unlock Episode
+                                </>
+                              ) : (
+                                <>
+                                  <FiPlay className="h-3.5 w-3.5 fill-current" /> Play Episode
+                                </>
+                              )}
                             </button>
                           ) : (
                             <span className="text-[10px] text-amber-500 font-semibold uppercase tracking-wider">Processing Stream</span>
@@ -405,7 +443,23 @@ export default function MovieDetails() {
               </div>
             ) : (
               <div className="flex flex-wrap gap-4 items-center">
-                {movie.hlsUrl ? (
+                {movie.isPremium && !isPremiumUser ? (
+                  <div className="flex flex-col gap-4 border border-[#ffb703]/20 bg-[#ffb703]/5 p-6 rounded-2xl max-w-md text-left">
+                    <div className="flex items-center gap-2 text-amber-500 font-bold text-lg">
+                      <FiLock className="h-5 w-5" />
+                      <span>🔒 Premium Content</span>
+                    </div>
+                    <p className="text-gray-300 text-xs font-light leading-relaxed">
+                      This movie is available for Premium members.
+                    </p>
+                    <Link
+                      to="/premium"
+                      className="inline-flex items-center justify-center gap-1.5 px-6 py-3 rounded-xl bg-gradient-to-r from-[#ffb703] to-[#ff8500] hover:from-[#ff8500] hover:to-[#ffb703] text-black font-black text-xs uppercase tracking-wider transition-all shadow-[0_4px_15px_rgba(255,183,3,0.2)] hover:scale-[1.02] cursor-pointer"
+                    >
+                      Get Premium – ₹99
+                    </Link>
+                  </div>
+                ) : movie.hlsUrl ? (
                   <button
                     onClick={handlePlayClick}
                     className="flex items-center gap-2.5 px-10 py-4 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_25px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_30px_rgba(229,9,20,0.65)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"

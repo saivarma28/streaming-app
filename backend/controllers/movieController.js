@@ -110,6 +110,24 @@ export async function getMovieById(req, res) {
       }
     }
 
+    // Check Premium Access restriction
+    if (movie.isPremium) {
+      let isPremiumAuthorized = false;
+      if (req.user?.firebaseUid) {
+        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
+        const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
+        if (user && (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date()))) {
+          isPremiumAuthorized = true;
+        }
+      }
+      if (!isPremiumAuthorized) {
+        return res.status(403).json({
+          success: false,
+          message: "Premium subscription required"
+        });
+      }
+    }
+
     // Populate genres relation
     const genres = await db.collection("genres")
       .find({ id: { $in: movie.genreIds || [] } })

@@ -2,6 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { connectToDatabase, getDb } from "./config/mongodb.js";
+import paymentRoutes from "./routes/paymentRoutes.js";
 
 // Import configurations and route definitions
 import "./config/firebaseAdmin.js"; // Side-effect import to initialize Firebase Admin SDK
@@ -40,6 +41,8 @@ app.use(async (req, res, next) => {
 const allowedOrigins = [
   FRONTEND_URL,
   "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:5175",
   "https://streaming-app-ten-opal.vercel.app"
 ];
 
@@ -47,8 +50,9 @@ app.use(
   cors({
     origin: function (origin, callback) {
       if (
-        !origin || 
-        allowedOrigins.includes(origin) || 
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.startsWith("http://localhost:") ||
         (origin.startsWith("https://streaming-app") && origin.endsWith(".vercel.app"))
       ) {
         callback(null, true);
@@ -96,6 +100,9 @@ app.get("/api/health", async (req, res) => {
 
 // 2. Authentication routes (retains Phase 1 email verification OTP)
 app.use("/api/auth", authRoutes);
+
+// Payment & subscription routes
+app.use("/api/payment", paymentRoutes);
 
 // 3. User synchronization and profile management routes (Phase 2)
 app.use("/api/users", userRoutes);

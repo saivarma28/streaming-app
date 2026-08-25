@@ -19,6 +19,7 @@ import ProtectedRoute from "../components/ProtectedRoute";
 import PublicRoute from "../components/PublicRoute";
 import Movies from "../pages/Movies";
 import TvShows from "../pages/TvShows";
+import Premium from "../pages/Premium";
 
 // High-fidelity premium placeholders for secondary routes
 const Placeholder = ({ title }) => (
@@ -52,6 +53,14 @@ export default function AppRoutes() {
         element={
           <ProtectedRoute>
             <Profile />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/premium"
+        element={
+          <ProtectedRoute>
+            <Premium />
           </ProtectedRoute>
         }
       />
