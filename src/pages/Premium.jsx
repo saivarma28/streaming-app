@@ -65,7 +65,7 @@ export default function Premium() {
         order_id: orderRes.orderId,
         prefill: {
           name: currentUser.displayName || "",
-          email: currentUser.email || "",
+          email: currentUser.email ? currentUser.email.replace("@", "+checkout@") : "",
           contact: ""
         },
         theme: {
