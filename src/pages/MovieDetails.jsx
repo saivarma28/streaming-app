@@ -12,6 +12,8 @@ export default function MovieDetails() {
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState(null);
+  const [errorStatus, setErrorStatus] = useState(null);
   const [resumeProgress, setResumeProgress] = useState(0);
   const [seasons, setSeasons] = useState([]);
   const [selectedSeason, setSelectedSeason] = useState(1);
@@ -119,6 +121,8 @@ export default function MovieDetails() {
       } catch (err) {
         console.error("Failed to load movie details:", err);
         setError(err.message || "Failed to retrieve movie details.");
+        setErrorCode(err.code || null);
+        setErrorStatus(err.status || null);
       } finally {
         setLoading(false);
       }
@@ -162,24 +166,102 @@ export default function MovieDetails() {
 
   if (loading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0d0e12]">
+      <div className="flex flex-col gap-4 h-screen items-center justify-center bg-[#0d0e12]">
         <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#e50914] border-t-transparent"></div>
+        <p className="text-gray-400 text-xs font-semibold uppercase tracking-widest animate-pulse">Checking access...</p>
       </div>
     );
   }
 
   if (error || !movie) {
+    // 1. Premium Required Screen
+    if (errorStatus === 403 || errorCode === "PREMIUM_REQUIRED" || error === "Premium subscription required") {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
+          <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-[#ffb703]/25 shadow-2xl flex flex-col items-center">
+            <div className="h-16 w-16 bg-[#ffb703]/10 border border-[#ffb703]/20 rounded-full flex items-center justify-center text-amber-500 mb-6 shadow-[0_0_20px_rgba(255,183,3,0.15)]">
+              <FiLock className="h-7 w-7" />
+            </div>
+            <h2 className="text-2xl font-black mb-3 uppercase tracking-wider text-white">🔒 PREMIUM CONTENT</h2>
+            <p className="text-sm text-gray-300 font-light leading-relaxed mb-1">
+              This movie is available exclusively for Premium members.
+            </p>
+            <p className="text-xs text-gray-400 font-light mb-8">
+              Upgrade to Premium to watch this movie and access all premium content.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 w-full">
+              <Link
+                to="/premium"
+                className="flex-1 py-3 px-6 rounded-xl bg-gradient-to-r from-[#ffb703] to-[#ff8500] hover:shadow-[0_4px_20px_rgba(255,133,0,0.35)] hover:scale-[1.02] text-black font-black uppercase text-xs tracking-wider transition-all text-center cursor-pointer"
+              >
+                GO PREMIUM
+              </Link>
+              <Link
+                to="/"
+                className="flex-1 py-3 px-6 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-xs uppercase tracking-wider border border-white/5 transition-all text-center cursor-pointer"
+              >
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // 2. Unauthorized Screen
+    if (errorStatus === 401) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
+          <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-white/5 shadow-2xl">
+            <FiAlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-3 uppercase tracking-wider text-white">Session Expired</h2>
+            <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
+              Please log in again to view this content.
+            </p>
+            <Link
+              to="/login"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#e50914] hover:bg-red-600 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Log In
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    // 3. Movie Not Found Screen
+    if (errorStatus === 404) {
+      return (
+        <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
+          <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-white/5 shadow-2xl">
+            <FiAlertCircle className="h-12 w-12 text-[#e50914] mx-auto mb-4" />
+            <h2 className="text-xl font-bold mb-3 uppercase tracking-wider text-white">Movie Not Found</h2>
+            <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
+              The requested title could not be found in our database.
+            </p>
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs uppercase tracking-wider transition-colors cursor-pointer border border-white/10"
+            >
+              <FiArrowLeft className="h-4 w-4" /> Back to Home
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
+    // 4. Default Generic Server/Network Error Screen
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0d0e12] px-4 text-center">
         <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-white/5 shadow-2xl">
           <FiAlertCircle className="h-12 w-12 text-[#e50914] mx-auto mb-4" />
-          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider">Error Loading Movie</h2>
+          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider text-white">Error Loading Movie</h2>
           <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
-            {error || "The requested movie could not be found."}
+            {error || "An unexpected network error occurred."}
           </p>
           <Link
             to="/"
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-sm transition-colors cursor-pointer border border-white/10"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-semibold text-xs uppercase tracking-wider transition-colors cursor-pointer border border-white/10"
           >
             <FiArrowLeft className="h-4 w-4" /> Back to Home
           </Link>

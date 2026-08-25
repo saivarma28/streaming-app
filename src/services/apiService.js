@@ -238,7 +238,10 @@ export async function getMovieById(token, id) {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.message || "Failed to fetch movie details.");
+      const error = new Error(data.message || "Failed to fetch movie details.");
+      error.status = response.status;
+      error.code = data.code || null;
+      throw error;
     }
     return data;
   } catch (error) {
@@ -643,7 +646,12 @@ export async function getTvShowById(token, id) {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Failed to fetch TV show details.");
+    if (!response.ok) {
+      const error = new Error(data.message || "Failed to fetch TV show details.");
+      error.status = response.status;
+      error.code = data.code || null;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error("getTvShowById API Error:", error.message);
@@ -711,7 +719,12 @@ export async function getSeasons(token, tvShowId) {
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Failed to fetch seasons.");
+    if (!response.ok) {
+      const error = new Error(data.message || "Failed to fetch seasons.");
+      error.status = response.status;
+      error.code = data.code || null;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error("getSeasons API Error:", error.message);
@@ -726,7 +739,12 @@ export async function getEpisodes(token, tvShowId, seasonNumber, adminView = fal
       headers: { "Authorization": `Bearer ${token}` }
     });
     const data = await response.json();
-    if (!response.ok) throw new Error(data.message || "Failed to fetch episodes.");
+    if (!response.ok) {
+      const error = new Error(data.message || "Failed to fetch episodes.");
+      error.status = response.status;
+      error.code = data.code || null;
+      throw error;
+    }
     return data;
   } catch (error) {
     console.error("getEpisodes API Error:", error.message);
