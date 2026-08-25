@@ -419,9 +419,6 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
       });
       hlsRef.current = hls;
 
-      hls.loadSource(hlsUrl);
-      hls.attachMedia(video);
-
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
         // Retrieve and build level options
         const levels = hls.levels || [];
@@ -471,6 +468,9 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
           }
         }
       });
+
+      hls.loadSource(hlsUrl);
+      hls.attachMedia(video);
     } else {
       video.src = hlsUrl;
       video.addEventListener("loadedmetadata", () => {
