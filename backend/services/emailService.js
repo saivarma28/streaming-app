@@ -3,28 +3,26 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
+let transporterInstance = null;
+
 /**
- * Sends a real verification OTP email to a user's address.
- * Throws an error if SMTP configuration credentials are not set.
- * 
- * @param {string} toEmail 
- * @param {string} otpCode 
+ * Creates and returns a cached Nodemailer transporter configuration.
  */
-export async function sendOtpEmail(toEmail, otpCode) {
+function getTransporter() {
+  if (transporterInstance) return transporterInstance;
+
   const host = process.env.EMAIL_HOST;
   const port = process.env.EMAIL_PORT;
   const user = process.env.EMAIL_USER;
   const password = process.env.EMAIL_PASSWORD;
-  const from = process.env.EMAIL_FROM || "noreply@streamingapp.com";
 
-  // Strict check: Throw explicit error if SMTP setup is missing/unconfigured
   if (!host || !port || !user || !password) {
     throw new Error(
       "SMTP server credentials are not configured in the backend environment variables (.env). Real emails cannot be sent."
     );
   }
 
-  const transporter = nodemailer.createTransport({
+  transporterInstance = nodemailer.createTransport({
     host,
     port: parseInt(port, 10),
     secure: parseInt(port, 10) === 465, // Use SSL/TLS for 465, STARTTLS for 587
@@ -37,20 +35,33 @@ export async function sendOtpEmail(toEmail, otpCode) {
     }
   });
 
+  return transporterInstance;
+}
+
+/**
+ * Sends a real verification OTP email to a user's address.
+ * 
+ * @param {string} toEmail 
+ * @param {string} otpCode 
+ */
+export async function sendOtpEmail(toEmail, otpCode) {
+  const from = process.env.EMAIL_FROM || "noreply@streamingapp.com";
+  const transporter = getTransporter();
+
   const mailOptions = {
     from,
     to: toEmail,
     subject: "Your Streaming App Verification Code",
     text: `Hello,
-
+ 
 Your verification code is:
-
+ 
 ${otpCode}
-
+ 
 This code will expire in 10 minutes.
-
+ 
 If you did not request this code, please ignore this email.
-
+ 
 Regards,
 Streaming App Team`,
     html: `<div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; rounded: 8px;">
@@ -78,30 +89,8 @@ Streaming App Team`,
  * @param {object} receiptDetails 
  */
 export async function sendPaymentReceiptEmail(toEmail, userName, receiptDetails) {
-  const host = process.env.EMAIL_HOST;
-  const port = process.env.EMAIL_PORT;
-  const user = process.env.EMAIL_USER;
-  const password = process.env.EMAIL_PASSWORD;
   const from = process.env.EMAIL_FROM || "noreply@streamingapp.com";
-
-  if (!host || !port || !user || !password) {
-    throw new Error(
-      "SMTP server credentials are not configured in the backend environment variables (.env). Real emails cannot be sent."
-    );
-  }
-
-  const transporter = nodemailer.createTransport({
-    host,
-    port: parseInt(port, 10),
-    secure: parseInt(port, 10) === 465,
-    auth: {
-      user,
-      pass: password
-    },
-    tls: {
-      rejectUnauthorized: false
-    }
-  });
+  const transporter = getTransporter();
 
   const mailOptions = {
     from,
