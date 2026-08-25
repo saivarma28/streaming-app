@@ -65,7 +65,8 @@ export default function Premium() {
         order_id: orderRes.orderId,
         prefill: {
           name: currentUser.displayName || "",
-          email: currentUser.email || ""
+          email: currentUser.email || "",
+          contact: ""
         },
         theme: {
           color: "#e50914" // StreamApp branding Red
