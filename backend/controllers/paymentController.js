@@ -10,6 +10,13 @@ export async function createOrder(req, res) {
   const { firebaseUid } = req.user;
   const { plan } = req.body;
 
+  if (!razorpay) {
+    return res.status(500).json({
+      success: false,
+      message: "Razorpay payment integration is not configured on this server."
+    });
+  }
+
   if (plan !== "premium") {
     return res.status(400).json({
       success: false,
@@ -82,6 +89,13 @@ export async function createOrder(req, res) {
 export async function verifyPayment(req, res) {
   const { firebaseUid } = req.user;
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+
+  if (!razorpay) {
+    return res.status(500).json({
+      success: false,
+      message: "Razorpay payment integration is not configured on this server."
+    });
+  }
 
   if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
     return res.status(400).json({
