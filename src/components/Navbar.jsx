@@ -71,11 +71,11 @@ export default function Navbar() {
         <div className="flex h-8 items-center justify-between">
           {/* Logo & Main Nav */}
           <div className="flex items-center gap-10">
-            <Link to="/" className="flex items-center gap-2 group">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#e50914] via-[#ff3838] to-[#ff7b00] shadow-[0_0_15px_rgba(229,9,20,0.5)] group-hover:scale-105 transition-transform duration-300">
-                <span className="text-white font-black text-xl italic tracking-wider">S</span>
+            <Link to="/" className="flex items-center gap-1.5 sm:gap-2 group">
+              <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-[#e50914] via-[#ff3838] to-[#ff7b00] shadow-[0_0_15px_rgba(229,9,20,0.5)] group-hover:scale-105 transition-transform duration-300">
+                <span className="text-white font-black text-base sm:text-xl italic tracking-wider">S</span>
               </div>
-              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-xl font-bold tracking-wider text-transparent transition-all duration-300 group-hover:text-white">
+              <span className="bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-sm sm:text-xl font-bold tracking-wider text-transparent transition-all duration-300 group-hover:text-white">
                 STREAM<span className="text-[#e50914]">APP</span>
               </span>
             </Link>
@@ -177,11 +177,56 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
-          <div className="flex md:hidden">
+          {/* Mobile Actions & Menu Trigger */}
+          <div className="flex md:hidden items-center gap-3">
+            {currentUser && (
+              <>
+                <button 
+                  onClick={() => {
+                    navigate("/");
+                    setTimeout(() => {
+                      const searchInput = document.querySelector('input[placeholder*="Search"]');
+                      if (searchInput) searchInput.focus();
+                    }, 100);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer p-1"
+                  aria-label="Search"
+                >
+                  <FiSearch className="h-5 w-5" />
+                </button>
+                <button 
+                  className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer relative p-1"
+                  aria-label="Notifications"
+                >
+                  <FiBell className="h-5 w-5" />
+                  <span className="absolute -top-0.5 -right-0.5 flex h-1.5 w-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
+                    <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
+                  </span>
+                </button>
+                <Link 
+                  to="/profile" 
+                  className="flex items-center text-gray-300 hover:text-white transition-all duration-300 p-1"
+                  aria-label="Profile"
+                >
+                  {currentUser.photoURL ? (
+                    <img
+                      src={currentUser.photoURL}
+                      alt={currentUser.displayName || "User"}
+                      className="h-6 w-6 rounded-full border border-white/10 object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-[#e50914] to-orange-600 text-white font-bold text-[10px] border border-white/10">
+                      {getUserInitials()}
+                    </div>
+                  )}
+                </Link>
+              </>
+            )}
             <button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer"
+              className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer p-1"
+              aria-label="Toggle Menu"
             >
               {isMobileMenuOpen ? <FiX className="h-6 w-6" /> : <FiMenu className="h-6 w-6" />}
             </button>

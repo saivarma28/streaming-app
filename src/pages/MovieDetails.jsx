@@ -553,9 +553,9 @@ export default function MovieDetails() {
                 )}
               </div>
             ) : (
-              <div className="flex flex-wrap gap-4 items-center">
+              <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center w-full">
                 {movie.isPremium && !isPremiumUser ? (
-                  <div className="flex flex-col gap-4 border border-[#ffb703]/20 bg-[#ffb703]/5 p-6 rounded-2xl max-w-md text-left">
+                  <div className="flex flex-col gap-4 border border-[#ffb703]/20 bg-[#ffb703]/5 p-6 rounded-2xl max-w-md text-left w-full sm:w-auto">
                     <div className="flex items-center gap-2 text-amber-500 font-bold text-lg">
                       <FiLock className="h-5 w-5" />
                       <span>🔒 Premium Content</span>
@@ -573,13 +573,13 @@ export default function MovieDetails() {
                 ) : movie.hlsUrl ? (
                   <button
                     onClick={handlePlayClick}
-                    className="flex items-center gap-2.5 px-10 py-4 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_25px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_30px_rgba(229,9,20,0.65)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-10 py-4 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_25px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_30px_rgba(229,9,20,0.65)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider text-center"
                   >
                     <FiPlay className="h-5 w-5 fill-current" />
                     {resumeProgress > 0 ? `Resume at ${Math.floor(resumeProgress / 60)}m` : "Play Stream"}
                   </button>
                 ) : (
-                  <div className="px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold max-w-md">
+                  <div className="w-full sm:w-auto px-5 py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm font-semibold max-w-md text-center sm:text-left">
                     Currently Unavailable: Streaming source has not been linked to this title.
                   </div>
                 )}
@@ -587,7 +587,7 @@ export default function MovieDetails() {
                 {movie.trailerUrl && (
                   <button
                     onClick={() => setShowTrailerModal(true)}
-                    className="flex items-center gap-2 px-10 py-4 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 px-10 py-4 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider text-center"
                   >
                     Watch Trailer
                   </button>
