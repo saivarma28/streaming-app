@@ -5,6 +5,16 @@ import { useAuth } from "../context/AuthContext";
 import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 
+/**
+ * Parses and extracts a 11-character YouTube video ID from various link styles.
+ */
+const getYouTubeId = (url) => {
+  if (!url) return null;
+  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const match = url.match(regExp);
+  return (match && match[2].length === 11) ? match[2] : null;
+};
+
 export default function MovieDetails() {
   const { id } = useParams();
   const { currentUser, dbUser } = useAuth();
@@ -15,6 +25,7 @@ export default function MovieDetails() {
   const [errorCode, setErrorCode] = useState(null);
   const [errorStatus, setErrorStatus] = useState(null);
   const [resumeProgress, setResumeProgress] = useState(0);
+  const [showTrailerModal, setShowTrailerModal] = useState(false);
   const [seasons, setSeasons] = useState([]);
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [episodes, setEpisodes] = useState([]);
@@ -39,10 +50,28 @@ export default function MovieDetails() {
 
           const tmdbItem = isTv ? data.tv : data.movie;
           
-          // Get trailer URL
-          const trailerVideo = tmdbItem.videos?.results?.find(
-            (v) => v.type === "Trailer" && v.site === "YouTube"
-          );
+          // Get trailer URL with strict prioritization (Requirement 10)
+          const videos = tmdbItem.videos?.results || [];
+          let trailerVideo = null;
+          
+          // 1. Look for Official Trailer
+          trailerVideo = videos.find(v => v.site === "YouTube" && v.type === "Trailer" && v.name?.toLowerCase().includes("official"));
+          
+          // 2. Fall back to standard Trailer
+          if (!trailerVideo) {
+            trailerVideo = videos.find(v => v.site === "YouTube" && v.type === "Trailer");
+          }
+          
+          // 3. Fall back to Teaser
+          if (!trailerVideo) {
+            trailerVideo = videos.find(v => v.site === "YouTube" && v.type === "Teaser");
+          }
+          
+          // 4. Fall back to any YouTube video type
+          if (!trailerVideo) {
+            trailerVideo = videos.find(v => v.site === "YouTube");
+          }
+          
           const trailerUrl = trailerVideo ? `https://www.youtube.com/watch?v=${trailerVideo.key}` : "";
 
           // Get cast and director
@@ -556,20 +585,55 @@ export default function MovieDetails() {
                 )}
 
                 {movie.trailerUrl && (
-                  <a
-                    href={movie.trailerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                  <button
+                    onClick={() => setShowTrailerModal(true)}
                     className="flex items-center gap-2 px-10 py-4 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-base uppercase tracking-wider"
                   >
                     Watch Trailer
-                  </a>
+                  </button>
                 )}
               </div>
             )}
           </div>
         </div>
       </div>
+      {/* 5. Trailer Overlay Video Modal */}
+      {showTrailerModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-fade-in">
+          {/* Close target background click */}
+          <div className="absolute inset-0" onClick={() => setShowTrailerModal(false)}></div>
+          
+          {/* Modal content box */}
+          <div className="relative w-full max-w-4xl aspect-video bg-[#0d0e12] rounded-2xl overflow-hidden border border-white/10 shadow-2xl z-10 flex items-center justify-center">
+            {/* Close Button top-right */}
+            <button
+              onClick={() => setShowTrailerModal(false)}
+              className="absolute top-4 right-4 z-50 p-2.5 rounded-full bg-black/60 hover:bg-black/85 border border-white/10 text-white hover:text-red-500 transition-colors cursor-pointer"
+              aria-label="Close Trailer"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+
+            {getYouTubeId(movie.trailerUrl) ? (
+              <iframe
+                src={`https://www.youtube.com/embed/${getYouTubeId(movie.trailerUrl)}?autoplay=1&rel=0&modestbranding=1`}
+                title={`${movie.title} Trailer`}
+                className="w-full h-full border-0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              ></iframe>
+            ) : (
+              <div className="text-center p-8">
+                <FiAlertCircle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+                <h3 className="text-lg font-bold text-white mb-2">Trailer Unavailable</h3>
+                <p className="text-sm text-gray-400">An official trailer is not available for this title inside StreamApp.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
