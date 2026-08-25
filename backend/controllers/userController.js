@@ -101,7 +101,11 @@ export async function syncUser(req, res) {
         photoURL: user.photoURL,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified
+        isPhoneVerified: user.isPhoneVerified,
+        isPremium: user.isPremium || false,
+        premiumExpiryDate: user.premiumExpiryDate || null,
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionExpiryDate: user.subscriptionExpiryDate || null
       }
     });
   } catch (error) {
@@ -145,7 +149,11 @@ export async function getMe(req, res) {
         photoURL: user.photoURL,
         role: user.role,
         isEmailVerified: user.isEmailVerified,
-        isPhoneVerified: user.isPhoneVerified
+        isPhoneVerified: user.isPhoneVerified,
+        isPremium: user.isPremium || false,
+        premiumExpiryDate: user.premiumExpiryDate || null,
+        subscriptionStatus: user.subscriptionStatus || null,
+        subscriptionExpiryDate: user.subscriptionExpiryDate || null
       }
     });
   } catch (error) {
@@ -198,7 +206,11 @@ export async function updateMe(req, res) {
         photoURL: updatedUser.photoURL,
         role: updatedUser.role,
         isEmailVerified: updatedUser.isEmailVerified,
-        isPhoneVerified: updatedUser.isPhoneVerified
+        isPhoneVerified: updatedUser.isPhoneVerified,
+        isPremium: updatedUser.isPremium || false,
+        premiumExpiryDate: updatedUser.premiumExpiryDate || null,
+        subscriptionStatus: updatedUser.subscriptionStatus || null,
+        subscriptionExpiryDate: updatedUser.subscriptionExpiryDate || null
       }
     });
   } catch (error) {
