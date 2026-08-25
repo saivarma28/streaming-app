@@ -13,7 +13,8 @@ import {
   FiRotateCcw, 
   FiRotateCw,
   FiSettings,
-  FiTv
+  FiTv,
+  FiSliders
 } from "react-icons/fi";
 
 /**
@@ -51,6 +52,9 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
   const [aspectRatio, setAspectRatio] = useState("contain");
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [qualities, setQualities] = useState([]);
+  const [currentQualityIndex, setCurrentQualityIndex] = useState(-1);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [seekFeedback, setSeekFeedback] = useState(null);
   const [doubleTapSide, setDoubleTapSide] = useState(null);
 
@@ -153,6 +157,17 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
     resetControlsTimer();
   };
 
+  // Change HLS Quality level
+  const changeQuality = (index) => {
+    setCurrentQualityIndex(index);
+    if (hlsRef.current) {
+      hlsRef.current.currentLevel = index;
+      console.log(`Switched HLS quality level to: ${index === -1 ? "Auto" : hlsRef.current.levels[index].height + "p"}`);
+    }
+    setShowQualityMenu(false);
+    resetControlsTimer();
+  };
+
   // Fullscreen toggle via Element Parent API
   const toggleFullscreen = () => {
     const container = playerContainerRef.current;
@@ -197,6 +212,7 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
     if (e.target !== e.currentTarget) return;
 
     setShowSpeedMenu(false); // Close dropdown menu if active
+    setShowQualityMenu(false); // Close quality menu if active
     resetControlsTimer();
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -407,6 +423,26 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
       hls.attachMedia(video);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
+        // Retrieve and build level options
+        const levels = hls.levels || [];
+        const qualityOptions = [{ index: -1, name: "Auto" }];
+        levels.forEach((level, idx) => {
+          const height = level.height;
+          const name = height ? `${height}p` : `Level ${idx + 1}`;
+          qualityOptions.push({ index: idx, name });
+        });
+        
+        // Sort descending
+        qualityOptions.sort((a, b) => {
+          if (a.index === -1) return -1;
+          if (b.index === -1) return 1;
+          const hA = parseInt(a.name) || 0;
+          const hB = parseInt(b.name) || 0;
+          return hB - hA;
+        });
+
+        setQualities(qualityOptions);
+
         if (startPosition > 0) {
           video.currentTime = startPosition;
         }
@@ -644,6 +680,45 @@ export default function VideoPlayer({ hlsUrl, startPosition = 0, onProgress, onC
                 <FiTv className="h-4.5 w-4.5" />
                 <span className="hidden md:inline">{aspectRatio === "contain" ? "Fit" : "Fill"}</span>
               </button>
+
+              {/* Quality Selection Menu (Only visible if qualities are loaded) */}
+              {qualities.length > 0 && (
+                <div className="relative">
+                  <button 
+                    onClick={() => { 
+                      setShowQualityMenu(!showQualityMenu); 
+                      setShowSpeedMenu(false); 
+                      resetControlsTimer(); 
+                    }}
+                    className="text-white/80 hover:text-white transition-colors cursor-pointer p-2 rounded-lg hover:bg-white/5 flex items-center gap-1 text-[10px] font-bold active:scale-95"
+                    aria-label="Quality Selection"
+                  >
+                    <FiSliders className="h-4.5 w-4.5" />
+                    <span>
+                      {currentQualityIndex === -1 
+                        ? "Auto" 
+                        : qualities.find(q => q.index === currentQualityIndex)?.name || "Auto"
+                      }
+                    </span>
+                  </button>
+
+                  {showQualityMenu && (
+                    <div className="absolute bottom-11 right-0 z-40 bg-[#12131a]/95 border border-white/5 rounded-xl py-2 px-1 shadow-2xl min-w-[100px] max-h-[220px] overflow-y-auto flex flex-col gap-0.5 backdrop-blur-xl">
+                      <p className="text-[8px] font-black text-gray-500 uppercase tracking-widest text-center py-1 border-b border-white/5 mb-1">Quality</p>
+                      {qualities.map((q) => (
+                        <button
+                          key={q.index}
+                          onClick={() => changeQuality(q.index)}
+                          className={`w-full text-left py-1.5 px-4.5 text-[11px] font-bold rounded-lg transition-colors cursor-pointer
+                            ${currentQualityIndex === q.index ? "bg-[#e50914] text-white" : "text-gray-300 hover:bg-white/5 hover:text-white"}`}
+                        >
+                          {q.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Playback speed popup */}
               <div className="relative">
