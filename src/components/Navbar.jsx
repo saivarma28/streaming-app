@@ -39,6 +39,17 @@ export default function Navbar() {
     }
   };
 
+  const handleSearchClick = () => {
+    if (pathname !== "/" && pathname !== "/movies" && pathname !== "/tv-shows") {
+      navigate("/");
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("open-search-overlay"));
+      }, 150);
+    } else {
+      window.dispatchEvent(new CustomEvent("open-search-overlay"));
+    }
+  };
+
   const navLinks = [
     { name: "Home", path: "/" },
     { name: "TV Shows", path: "/tv-shows" },
@@ -121,7 +132,10 @@ export default function Navbar() {
                     Go Premium
                   </Link>
                 )}
-                <button className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer">
+                <button 
+                  onClick={handleSearchClick}
+                  className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer"
+                >
                   <FiSearch className="h-5 w-5" />
                 </button>
                 <button className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer relative">
@@ -182,13 +196,7 @@ export default function Navbar() {
             {currentUser && (
               <>
                 <button 
-                  onClick={() => {
-                    navigate("/");
-                    setTimeout(() => {
-                      const searchInput = document.querySelector('input[placeholder*="Search"]');
-                      if (searchInput) searchInput.focus();
-                    }, 100);
-                  }}
+                  onClick={handleSearchClick}
                   className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer p-1"
                   aria-label="Search"
                 >

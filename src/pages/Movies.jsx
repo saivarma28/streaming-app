@@ -15,6 +15,32 @@ export default function Movies() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpenSearch = () => {
+      setIsSearchOpen(true);
+    };
+    window.addEventListener("open-search-overlay", handleOpenSearch);
+    return () => window.removeEventListener("open-search-overlay", handleOpenSearch);
+  }, []);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        handleCloseSearch();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSearchOpen]);
+
+  const handleCloseSearch = () => {
+    setIsSearchOpen(false);
+    setSearchQuery("");
+    setSelectedGenreId(null);
+  };
 
   useEffect(() => {
     async function loadCatalog() {
@@ -132,57 +158,7 @@ export default function Movies() {
         </div>
       )}
 
-      {/* Search & Genre Filtering Controls */}
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
-        <div className="flex flex-col md:flex-row gap-4 justify-between items-center bg-white/5 border border-white/5 p-4 rounded-2xl backdrop-blur-md">
-          {/* Genre Category Badges */}
-          <div className="flex flex-wrap gap-2 justify-start items-center">
-            <button
-              onClick={() => setSelectedGenreId(null)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                selectedGenreId === null
-                  ? "bg-[#e50914] text-white shadow-md"
-                  : "bg-white/5 hover:bg-white/10 text-gray-300"
-              }`}
-            >
-              All Genres
-            </button>
-            {genres.map(genre => (
-              <button
-                key={genre.id}
-                onClick={() => setSelectedGenreId(genre.id)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                  selectedGenreId === genre.id
-                    ? "bg-[#e50914] text-white shadow-md"
-                    : "bg-white/5 hover:bg-white/10 text-gray-300"
-                }`}
-              >
-                {genre.name}
-              </button>
-            ))}
-          </div>
 
-          {/* Search Input Box */}
-          <div className="relative w-full md:w-80">
-            <FiSearch className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-            <input
-              type="text"
-              placeholder="Search movies..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-11 pr-10 py-2.5 rounded-xl border border-white/5 bg-white/5 text-xs text-white placeholder-gray-400 outline-none focus:border-red-500/40 focus:bg-white/10 transition-all"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
-              >
-                <FiX className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Catalog Grid */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-12 space-y-12 pb-24">
@@ -192,60 +168,6 @@ export default function Movies() {
             <p className="text-gray-400 font-light text-sm">
               Our movies library is currently empty. Check back later for premium titles.
             </p>
-          </div>
-        ) : (searchQuery || selectedGenreId) ? (
-          // Flat Grid View for Searched/Filtered Results
-          <div className="space-y-6 text-left">
-            <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
-              <h3 className="text-xl font-bold tracking-tight text-white uppercase">Search Results ({filteredMovies.length})</h3>
-            </div>
-
-            {filteredMovies.length === 0 ? (
-              <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
-                <h3 className="text-lg font-bold text-white mb-1">No Results</h3>
-                <p className="text-gray-400 font-light text-xs">
-                  We couldn't find any movies matching "{searchQuery}".
-                </p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {filteredMovies.map((movie) => (
-                  <div
-                    key={movie.id}
-                    onClick={() => navigate(`/movie/${movie.id}`)}
-                    className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
-                  >
-                    {movie.thumbnailUrl ? (
-                      <OptimizedImage
-                        src={movie.thumbnailUrl}
-                        alt={movie.title}
-                        className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                        <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
-                      </div>
-                    )}
-
-                    <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
-
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
-                      <div className="flex items-center justify-between mb-1.5">
-                        {movie.isPremium && (
-                          <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                            ⭐ PREMIUM
-                          </span>
-                        )}
-                        <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
-                      </div>
-                      <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                        {movie.title}
-                      </h4>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         ) : (
           // Default Rows View
@@ -350,6 +272,138 @@ export default function Movies() {
           </div>
         )}
       </div>
+
+      {/* Search Overlay */}
+      {isSearchOpen && (
+        <div 
+          onClick={handleCloseSearch}
+          className="fixed inset-0 z-50 bg-[#090a0f]/98 backdrop-blur-xl overflow-y-auto pt-24 pb-12 px-4 sm:px-6 lg:px-8 transition-all duration-300"
+        >
+          {/* Close Button */}
+          <button 
+            onClick={handleCloseSearch}
+            className="absolute top-8 right-8 text-gray-400 hover:text-white transition-colors cursor-pointer p-2 rounded-full hover:bg-white/5 z-55"
+          >
+            <FiX className="h-6 w-6" />
+          </button>
+
+          {/* Search Content Wrapper */}
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="max-w-7xl mx-auto w-full flex flex-col items-center"
+          >
+            {/* Search Input Box */}
+            <div className="relative w-full max-w-3xl mb-6">
+              <FiSearch className="absolute left-5 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search movies..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-14 pr-12 py-3.5 rounded-2xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-400 outline-none focus:border-red-500/40 focus:bg-white/10 transition-all shadow-xl"
+              />
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  <FiX className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+
+            {/* Genre Category Badges */}
+            <div className="flex flex-wrap gap-2 justify-center items-center max-w-4xl mb-10 bg-white/5 border border-white/5 p-3 rounded-2xl">
+              <button
+                onClick={() => setSelectedGenreId(null)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                  selectedGenreId === null
+                    ? "bg-[#e50914] text-white shadow-md"
+                    : "bg-white/5 hover:bg-white/10 text-gray-300"
+                }`}
+              >
+                All Genres
+              </button>
+              {genres.map(genre => (
+                <button
+                  key={genre.id}
+                  onClick={() => setSelectedGenreId(genre.id)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    selectedGenreId === genre.id
+                      ? "bg-[#e50914] text-white shadow-md"
+                      : "bg-white/5 hover:bg-white/10 text-gray-300"
+                  }`}
+                >
+                  {genre.name}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Results Inside Overlay */}
+            <div className="w-full text-left space-y-12">
+              <div className="space-y-6">
+                <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
+                  <h3 className="text-xl font-bold tracking-tight text-white uppercase">
+                    Movie Results ({filteredMovies.length})
+                  </h3>
+                </div>
+
+                {filteredMovies.length === 0 ? (
+                  <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
+                    <h3 className="text-sm font-bold text-white mb-1">No Matching Movies</h3>
+                    <p className="text-gray-400 font-light text-xs">
+                      We couldn't find any movies matching your search term or genre choice.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                    {filteredMovies.map((movie) => (
+                      <div
+                        key={movie.id}
+                        onClick={() => {
+                          handleCloseSearch();
+                          navigate(`/movie/${movie.id}`);
+                        }}
+                        className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
+                      >
+                        {movie.thumbnailUrl ? (
+                          <OptimizedImage
+                            src={movie.thumbnailUrl}
+                            alt={movie.title}
+                            className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
+                          />
+                        ) : (
+                          <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
+                          </div>
+                        )}
+
+                        <div className="absolute inset-0 border-2 border-transparent group-hover:border-red-500/30 rounded-2xl transition-all duration-300"></div>
+
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
+                          <div className="flex items-center justify-between mb-1.5">
+                            {movie.isPremium && (
+                              <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                                ⭐ PREMIUM
+                              </span>
+                            )}
+                            <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
+                          </div>
+                          <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
+                            {movie.title}
+                          </h4>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }
