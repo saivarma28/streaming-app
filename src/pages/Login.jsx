@@ -5,7 +5,7 @@ import { FiMail, FiLock, FiPhone, FiAlertCircle, FiCheckCircle } from "react-ico
 import { FcGoogle } from "react-icons/fc";
 import { RecaptchaVerifier } from "firebase/auth";
 import { auth } from "../firebase";
-import { syncUser } from "../services/apiService";
+import { syncUser, checkPhoneExists } from "../services/apiService";
 
 export default function Login() {
   const [step, setStep] = useState(1); // 1 = Details input, 2 = Phone OTP verification
@@ -107,6 +107,14 @@ export default function Login() {
 
       try {
         setLoading(true);
+
+        // Check phone existence in MongoDB before sending OTP (Requirement 4)
+        const checkRes = await checkPhoneExists(fullPhoneNumber);
+        if (!checkRes.exists) {
+          setError("Account not found. Please register first.");
+          setLoading(false);
+          return;
+        }
 
         // Setup invisible reCAPTCHA verifier
         if (!recaptchaVerifierRef.current) {

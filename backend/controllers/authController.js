@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { saveOtp, getOtp, incrementAttempts, deleteOtp, MAX_ATTEMPTS } from "../utils/otpStore.js";
 import { sendOtpEmail } from "../services/emailService.js";
+import { getDb } from "../config/mongodb.js";
 
 /**
  * Generates and sends a 6-digit verification code to the requested email.
@@ -123,5 +124,30 @@ export async function verifyEmailOtp(req, res) {
   } catch (error) {
     console.error("verifyEmailOtp Controller Error:", error.message);
     return res.status(500).json({ success: false, message: "An error occurred during verification." });
+  }
+}
+
+/**
+ * Checks whether a phone number is already registered in MongoDB.
+ * 
+ * GET /api/auth/check-phone
+ */
+export async function checkPhoneExists(req, res) {
+  const { phoneNumber } = req.query;
+
+  if (!phoneNumber) {
+    return res.status(400).json({ success: false, message: "Phone number query parameter is required." });
+  }
+
+  try {
+    const db = getDb();
+    const user = await db.collection("users").findOne({ phoneNumber });
+    return res.status(200).json({
+      success: true,
+      exists: !!user
+    });
+  } catch (error) {
+    console.error("checkPhoneExists Error:", error.message);
+    return res.status(500).json({ success: false, message: "An error occurred while checking phone status." });
   }
 }

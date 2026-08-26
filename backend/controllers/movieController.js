@@ -115,9 +115,11 @@ export async function getMovieById(req, res) {
       let isPremiumAuthorized = false;
       if (req.user?.firebaseUid) {
         const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
-        const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
-        if (user && (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date()))) {
-          isPremiumAuthorized = true;
+        if (user) {
+          const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
+          if (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date())) {
+            isPremiumAuthorized = true;
+          }
         }
       }
       if (!isPremiumAuthorized) {

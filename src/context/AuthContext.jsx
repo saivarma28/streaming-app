@@ -15,7 +15,7 @@ import {
   linkWithCredential,
   PhoneAuthProvider
 } from "firebase/auth";
-import { getUserMe } from "../services/apiService";
+import { getUserMe, syncUser } from "../services/apiService";
 
 const AuthContext = createContext();
 
@@ -42,6 +42,20 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.warn("Failed to fetch MongoDB user profile inside AuthContext:", err.message);
+        if (err.message && err.message.toLowerCase().includes("not found")) {
+          try {
+            console.log("Attempting to auto-sync Firebase user with MongoDB...");
+            const token = await firebaseUser.getIdToken();
+            const syncRes = await syncUser(token);
+            if (syncRes.success && syncRes.user) {
+              setDbUser(syncRes.user);
+              setRole(syncRes.user.role);
+              return syncRes.user;
+            }
+          } catch (syncErr) {
+            console.error("Auto-sync failed inside AuthContext:", syncErr.message);
+          }
+        }
       }
     } else {
       setDbUser(null);

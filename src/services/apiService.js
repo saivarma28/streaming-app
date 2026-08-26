@@ -59,6 +59,33 @@ export async function verifyEmailOtp(email, otp) {
 }
 
 /**
+ * Check if a phone number is already registered in MongoDB.
+ * Hits GET /api/auth/check-phone?phoneNumber=+91XXXXXXXXXX
+ * 
+ * @param {string} phoneNumber 
+ * @returns {Promise<{success: boolean, exists: boolean}>}
+ */
+export async function checkPhoneExists(phoneNumber) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/auth/check-phone?phoneNumber=${encodeURIComponent(phoneNumber)}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.message || "Failed to check phone number registration status.");
+    }
+    return data;
+  } catch (error) {
+    console.error("checkPhoneExists API Error:", error.message);
+    throw error;
+  }
+}
+
+/**
  * Synchronize Firebase user details with MongoDB.
  * Hits POST /api/users/sync
  * 
