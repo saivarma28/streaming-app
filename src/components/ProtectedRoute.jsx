@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
  * Signed In -> Email Verified -> Phone Verified -> Protected App
  */
 export default function ProtectedRoute({ children, adminOnly = false }) {
-  const { currentUser, role, loading, authTimeout } = useAuth();
+  const { currentUser, dbUser, role, loading, authTimeout, logout } = useAuth();
 
   if (authTimeout) {
     return (
@@ -45,6 +45,26 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
   // 1. Check if user is logged in
   if (!currentUser) {
     return <Navigate to="/login" replace />;
+  }
+
+  // 1b. Check if account is disabled in MongoDB
+  if (dbUser && dbUser.isDisabled) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#0d0e12] px-6 text-center text-white">
+        <div className="max-w-md p-8 bg-[#12131a] rounded-2xl border border-white/5 shadow-2xl">
+          <div className="h-12 w-12 rounded-full bg-red-500/10 text-red-500 flex items-center justify-center mx-auto mb-4 border border-red-500/20 text-xl font-bold">
+            !
+          </div>
+          <h2 className="text-xl font-bold mb-3 uppercase tracking-wider text-red-500">Account Disabled</h2>
+          <p className="text-sm text-gray-400 font-light mb-6 leading-relaxed">
+            Your account has been disabled. Please contact the administrator.
+          </p>
+          <button onClick={logout} className="px-6 py-2 rounded-xl bg-[#e50914] hover:bg-red-700 text-white font-semibold text-sm transition-colors cursor-pointer">
+            Logout
+          </button>
+        </div>
+      </div>
+    );
   }
 
   // 2. Check if page is admin only

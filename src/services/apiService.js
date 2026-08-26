@@ -959,6 +959,97 @@ export async function getSubscriptionStatus(token) {
   }
 }
 
+export async function adminCreateUser(token, userData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/admin-create`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(userData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to create user.");
+    return data;
+  } catch (error) {
+    console.error("adminCreateUser API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function adminUpdateUser(token, firebaseUid, updateData) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/${firebaseUid}/admin-update`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify(updateData)
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to update user.");
+    return data;
+  } catch (error) {
+    console.error("adminUpdateUser API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function adminResetPassword(token, firebaseUid, newPassword) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/${firebaseUid}/reset-password`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${token}`
+      },
+      body: JSON.stringify({ newPassword })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to reset password.");
+    return data;
+  } catch (error) {
+    console.error("adminResetPassword API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function adminDeleteUser(token, firebaseUid) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/${firebaseUid}`, {
+      method: "DELETE",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to delete user.");
+    return data;
+  } catch (error) {
+    console.error("adminDeleteUser API Error:", error.message);
+    throw error;
+  }
+}
+
+export async function getAdminAuditLogs(token) {
+  try {
+    const response = await fetch(`${BACKEND_URL}/api/users/audit-logs`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.message || "Failed to retrieve audit logs.");
+    return data;
+  } catch (error) {
+    console.error("getAdminAuditLogs API Error:", error.message);
+    throw error;
+  }
+}
+
 
 
 
