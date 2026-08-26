@@ -127,6 +127,10 @@ export function AuthProvider({ children }) {
 
     // Setup listener for firebase auth state change
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // Firebase has responded, meaning auth is initialized. Clear the timeout immediately.
+      clearTimeout(timer);
+      setAuthTimeout(false);
+
       setCurrentUser(user);
       if (user) {
         await fetchDbProfile(user);
@@ -135,13 +139,11 @@ export function AuthProvider({ children }) {
         setRole("user");
       }
       setLoading(false);
-      setAuthTimeout(false);
-      clearTimeout(timer);
     }, (error) => {
       console.warn("Firebase Auth error: ", error.message);
-      setLoading(false);
-      setAuthTimeout(false);
       clearTimeout(timer);
+      setAuthTimeout(false);
+      setLoading(false);
     });
 
     return () => {

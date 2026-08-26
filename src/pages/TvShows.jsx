@@ -4,6 +4,7 @@ import { FiPlay, FiInfo, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { getTvShows, getGenres } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
+import OptimizedImage from "../components/OptimizedImage";
 
 export default function TvShows() {
   const { currentUser } = useAuth();
@@ -77,7 +78,7 @@ export default function TvShows() {
         <div className="relative h-[450px] md:h-[550px] w-full overflow-hidden">
           {/* Background Image / Backdrop */}
           <div className="absolute inset-0">
-            <img
+            <OptimizedImage
               src={featuredShow.backdropUrl || featuredShow.thumbnailUrl || heroBannerFallback}
               alt={featuredShow.title}
               className="h-full w-full object-cover object-center transform scale-105 transition-transform duration-1000"
@@ -208,7 +209,7 @@ export default function TvShows() {
                     className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                   >
                     {show.thumbnailUrl ? (
-                      <img
+                      <OptimizedImage
                         src={show.thumbnailUrl}
                         alt={show.title}
                         className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -260,7 +261,7 @@ export default function TvShows() {
                         className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                       >
                         {show.thumbnailUrl ? (
-                          <img
+                          <OptimizedImage
                             src={show.thumbnailUrl}
                             alt={show.title}
                             className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -308,7 +309,7 @@ export default function TvShows() {
                       className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                     >
                       {show.thumbnailUrl ? (
-                        <img
+                        <OptimizedImage
                           src={show.thumbnailUrl}
                           alt={show.title}
                           className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"

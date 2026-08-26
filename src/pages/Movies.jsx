@@ -4,6 +4,7 @@ import { FiPlay, FiInfo, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { getMovies, getGenres } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
+import OptimizedImage from "../components/OptimizedImage";
 
 export default function Movies() {
   const { currentUser } = useAuth();
@@ -77,7 +78,7 @@ export default function Movies() {
         <div className="relative h-[450px] md:h-[550px] w-full overflow-hidden">
           {/* Background Image / Backdrop */}
           <div className="absolute inset-0">
-            <img
+            <OptimizedImage
               src={featuredMovie.backdropUrl || featuredMovie.thumbnailUrl || heroBannerFallback}
               alt={featuredMovie.title}
               className="h-full w-full object-cover object-center transform scale-105 transition-transform duration-1000"
@@ -215,7 +216,7 @@ export default function Movies() {
                     className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                   >
                     {movie.thumbnailUrl ? (
-                      <img
+                      <OptimizedImage
                         src={movie.thumbnailUrl}
                         alt={movie.title}
                         className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -267,7 +268,7 @@ export default function Movies() {
                         className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                       >
                         {movie.thumbnailUrl ? (
-                          <img
+                          <OptimizedImage
                             src={movie.thumbnailUrl}
                             alt={movie.title}
                             className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -315,7 +316,7 @@ export default function Movies() {
                       className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                     >
                       {movie.thumbnailUrl ? (
-                        <img
+                        <OptimizedImage
                           src={movie.thumbnailUrl}
                           alt={movie.title}
                           className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"

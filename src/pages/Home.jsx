@@ -13,6 +13,7 @@ import {
   searchTmdb
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
+import OptimizedImage from "../components/OptimizedImage";
 
 // Static mapping of TMDB genre IDs to human-readable names
 const TMDB_GENRES = {
@@ -305,7 +306,7 @@ export default function Home() {
         <div className="relative h-[500px] md:h-[600px] w-full overflow-hidden">
           {/* Background Image / Backdrop */}
           <div className="absolute inset-0">
-            <img
+            <OptimizedImage
               src={featuredMovie.backdropUrl || featuredMovie.thumbnailUrl || heroBannerFallback}
               alt={featuredMovie.title}
               className="h-full w-full object-cover object-center transform scale-105 transition-transform duration-1000"
@@ -432,7 +433,7 @@ export default function Home() {
                     className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                   >
                     {item.movie.thumbnailUrl ? (
-                      <img
+                      <OptimizedImage
                         src={item.movie.thumbnailUrl}
                         alt={item.movie.title}
                         className="absolute inset-0 h-full w-full object-cover opacity-70 group-hover:opacity-90 transition-all duration-300"
@@ -505,7 +506,7 @@ export default function Home() {
                       className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                     >
                       {movie.thumbnailUrl ? (
-                        <img
+                        <OptimizedImage
                           src={movie.thumbnailUrl}
                           alt={movie.title}
                           className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -571,7 +572,7 @@ export default function Home() {
                           className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                         >
                           {item.backdrop_path || item.poster_path ? (
-                            <img
+                            <OptimizedImage
                               src={`https://image.tmdb.org/t/p/w500${item.backdrop_path || item.poster_path}`}
                               alt={item.title || item.name}
                               className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -627,7 +628,7 @@ export default function Home() {
                         className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                       >
                         {movie.thumbnailUrl ? (
-                          <img
+                          <OptimizedImage
                             src={movie.thumbnailUrl}
                             alt={movie.title}
                             className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
@@ -676,7 +677,7 @@ export default function Home() {
                       className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                     >
                       {movie.thumbnailUrl ? (
-                        <img
+                        <OptimizedImage
                           src={movie.thumbnailUrl}
                           alt={movie.title}
                           className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"

@@ -4,6 +4,7 @@ import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle, FiUse
 import { useAuth } from "../context/AuthContext";
 import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
+import OptimizedImage from "../components/OptimizedImage";
 
 /**
  * Parses and extracts a 11-character YouTube video ID from various link styles.
@@ -304,7 +305,7 @@ export default function MovieDetails() {
       {/* Backdrop Section */}
       <div className="relative h-[65vh] w-full overflow-hidden">
         <div className="absolute inset-0">
-          <img
+          <OptimizedImage
             src={movie.backdropUrl || movie.thumbnailUrl || heroBannerFallback}
             alt={movie.title}
             className="h-full w-full object-cover object-center"
@@ -330,7 +331,7 @@ export default function MovieDetails() {
           <div className="w-64 shrink-0 mx-auto md:mx-0">
             <div className="aspect-[2/3] w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl bg-gray-900/40">
               {movie.thumbnailUrl ? (
-                <img
+                <OptimizedImage
                   src={movie.thumbnailUrl}
                   alt={movie.title}
                   className="h-full w-full object-cover"
