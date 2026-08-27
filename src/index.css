@@ -40,3 +40,11 @@ body {
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Pad the main container on mobile when PWA bottom navigation is visible */
+@media (max-width: 767px) {
+  .pb-mobile-bottom-nav {
+    padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+
