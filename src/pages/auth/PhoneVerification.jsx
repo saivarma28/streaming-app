@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { RecaptchaVerifier, updateProfile } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth } from "../../firebase";
 import { FiPhone, FiLock, FiAlertCircle, FiCheckCircle, FiLogOut, FiArrowLeft } from "react-icons/fi";
-import { syncUser } from "../services/apiService";
+import { syncUser } from "../../services/apiService";
 
 export default function PhoneVerification() {
   const { currentUser, signInWithPhone, linkPhone, logout, fetchDbProfile } = useAuth();

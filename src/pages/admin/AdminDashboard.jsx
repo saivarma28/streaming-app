@@ -1,16 +1,16 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
-import AdminSidebar from "../components/admin/AdminSidebar";
-import AdminDashboardHome from "../components/admin/AdminDashboardHome";
-import AdminMovies from "../components/admin/AdminMovies";
-import AdminMovieForm from "../components/admin/AdminMovieForm";
-import AdminTvShows from "../components/admin/AdminTvShows";
-import AdminTvShowForm from "../components/admin/AdminTvShowForm";
-import AdminSeasons from "../components/admin/AdminSeasons";
-import AdminEpisodes from "../components/admin/AdminEpisodes";
-import AdminTmdb from "../components/admin/AdminTmdb";
-import AdminUsers from "../components/admin/AdminUsers";
-import AdminGenres from "../components/admin/AdminGenres";
+import AdminSidebar from "../../components/admin/AdminSidebar";
+import AdminDashboardHome from "../../components/admin/AdminDashboardHome";
+import AdminMovies from "../../components/admin/AdminMovies";
+import AdminMovieForm from "../../components/admin/AdminMovieForm";
+import AdminTvShows from "../../components/admin/AdminTvShows";
+import AdminTvShowForm from "../../components/admin/AdminTvShowForm";
+import AdminSeasons from "../../components/admin/AdminSeasons";
+import AdminEpisodes from "../../components/admin/AdminEpisodes";
+import AdminTmdb from "../../components/admin/AdminTmdb";
+import AdminUsers from "../../components/admin/AdminUsers";
+import AdminGenres from "../../components/admin/AdminGenres";
 
 export default function AdminDashboard() {
   return (

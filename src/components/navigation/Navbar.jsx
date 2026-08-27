@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar, FiDownload, FiShare, FiPlusSquare } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext";
-import { usePWAInstall } from "../hooks/usePWAInstall";
+import { useAuth } from "../../context/AuthContext";
+import { usePWAInstall } from "../../hooks/usePWAInstall";
+
 
 export default function Navbar() {
   const { pathname } = useLocation();

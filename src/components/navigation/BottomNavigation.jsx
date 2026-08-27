@@ -1,7 +1,7 @@
 import React from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { FiHome, FiTv, FiUser } from 'react-icons/fi';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
 
 export default function BottomNavigation() {
   const { pathname } = useLocation();

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import heroBannerFallback from "../assets/hero_banner.png";
+import heroBannerFallback from "../../assets/hero_banner.png";
 
 /**
  * Reusable image component that optimizes loading performance:

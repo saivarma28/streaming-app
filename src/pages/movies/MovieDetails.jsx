@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { FiPlay, FiArrowLeft, FiClock, FiCalendar, FiGlobe, FiAlertCircle, FiUser, FiLock } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext";
-import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../services/apiService";
-import heroBannerFallback from "../assets/hero_banner.png";
-import OptimizedImage from "../components/OptimizedImage";
+import { useAuth } from "../../context/AuthContext";
+import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../../services/apiService";
+import heroBannerFallback from "../../assets/hero_banner.png";
+import OptimizedImage from "../../components/ui/OptimizedImage";
 
 /**
  * Parses and extracts a 11-character YouTube video ID from various link styles.

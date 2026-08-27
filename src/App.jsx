@@ -1,11 +1,11 @@
 import React from 'react'
 import { BrowserRouter, useLocation } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
-import Navbar from './components/Navbar'
+import Navbar from './components/navigation/Navbar'
 import AppRoutes from './routes/AppRoutes'
-import PWAUpdater from './components/PWAUpdater'
-import OfflineBanner from './components/OfflineBanner'
-import BottomNavigation from './components/BottomNavigation'
+import PWAUpdater from './components/common/PWAUpdater'
+import OfflineBanner from './components/common/OfflineBanner'
+import BottomNavigation from './components/navigation/BottomNavigation'
 
 function AppContent() {
   const { pathname } = useLocation();

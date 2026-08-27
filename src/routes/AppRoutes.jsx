@@ -1,25 +1,25 @@
 import React from "react";
 import { Routes, Route } from "react-router-dom";
 import Home from "../pages/Home";
-import Login from "../pages/Login";
-import Register from "../pages/Register";
-import VerifyEmailOtp from "../pages/VerifyEmailOtp";
-import PhoneVerification from "../pages/PhoneVerification";
-import ForgotPasswordSelector from "../pages/ForgotPasswordSelector";
-import ForgotPasswordEmail from "../pages/ForgotPasswordEmail";
-import ForgotPasswordPhone from "../pages/ForgotPasswordPhone";
-import ForgotPasswordPhoneVerify from "../pages/ForgotPasswordPhoneVerify";
-import ForgotPasswordPhoneReset from "../pages/ForgotPasswordPhoneReset";
-import ResetPassword from "../pages/ResetPassword";
-import Profile from "../pages/Profile";
-import MovieDetails from "../pages/MovieDetails";
-import VideoPlayerPage from "../pages/VideoPlayerPage";
-import AdminDashboard from "../pages/AdminDashboard";
-import ProtectedRoute from "../components/ProtectedRoute";
-import PublicRoute from "../components/PublicRoute";
-import Movies from "../pages/Movies";
-import TvShows from "../pages/TvShows";
-import Premium from "../pages/Premium";
+import Login from "../pages/auth/Login";
+import Register from "../pages/auth/Register";
+import VerifyEmailOtp from "../pages/auth/VerifyEmailOtp";
+import PhoneVerification from "../pages/auth/PhoneVerification";
+import ForgotPasswordSelector from "../pages/auth/ForgotPasswordSelector";
+import ForgotPasswordEmail from "../pages/auth/ForgotPasswordEmail";
+import ForgotPasswordPhone from "../pages/auth/ForgotPasswordPhone";
+import ForgotPasswordPhoneVerify from "../pages/auth/ForgotPasswordPhoneVerify";
+import ForgotPasswordPhoneReset from "../pages/auth/ForgotPasswordPhoneReset";
+import ResetPassword from "../pages/auth/ResetPassword";
+import Profile from "../pages/profile/Profile";
+import MovieDetails from "../pages/movies/MovieDetails";
+import VideoPlayerPage from "../pages/movies/VideoPlayerPage";
+import AdminDashboard from "../pages/admin/AdminDashboard";
+import ProtectedRoute from "../components/common/ProtectedRoute";
+import PublicRoute from "../components/common/PublicRoute";
+import Movies from "../pages/movies/Movies";
+import TvShows from "../pages/tv/TvShows";
+import Premium from "../pages/payment/Premium";
 
 // High-fidelity premium placeholders for secondary routes
 const Placeholder = ({ title }) => (

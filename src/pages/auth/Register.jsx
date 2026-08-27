@@ -2,8 +2,8 @@ import React, { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FiUser, FiMail, FiPhone, FiLock, FiAlertCircle } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
-import { useAuth } from "../context/AuthContext";
-import { sendEmailOtp } from "../services/apiService";
+import { useAuth } from "../../context/AuthContext";
+import { sendEmailOtp } from "../../services/apiService";
 
 export default function Register() {
   const submittingRef = useRef(false);

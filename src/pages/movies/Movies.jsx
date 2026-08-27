@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FiPlay, FiInfo, FiSearch, FiX } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext";
-import { getTvShows, getGenres } from "../services/apiService";
-import heroBannerFallback from "../assets/hero_banner.png";
-import OptimizedImage from "../components/OptimizedImage";
+import { useAuth } from "../../context/AuthContext";
+import { getMovies, getGenres } from "../../services/apiService";
+import heroBannerFallback from "../../assets/hero_banner.png";
+import OptimizedImage from "../../components/ui/OptimizedImage";
 
-export default function TvShows() {
+export default function Movies() {
   const { currentUser } = useAuth();
-  const [tvShows, setTvShows] = useState([]);
+  const [movies, setMovies] = useState([]);
   const [genres, setGenres] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenreId, setSelectedGenreId] = useState(null);
@@ -48,16 +48,16 @@ export default function TvShows() {
         if (!currentUser) return;
         const token = await currentUser.getIdToken();
         
-        const [tvShowsData, genresData] = await Promise.all([
-          getTvShows(token),
+        const [moviesData, genresData] = await Promise.all([
+          getMovies(token),
           getGenres(token)
         ]);
 
-        setTvShows(tvShowsData.tvShows || []);
+        setMovies(moviesData.movies || []);
         setGenres(genresData.genres || []);
       } catch (err) {
-        console.error("Failed to load TV shows catalog:", err);
-        setError("Could not load TV shows. Please check your connection.");
+        console.error("Failed to load movies catalog:", err);
+        setError("Could not load movies. Please check your connection.");
       } finally {
         setLoading(false);
       }
@@ -66,26 +66,26 @@ export default function TvShows() {
     loadCatalog();
   }, [currentUser]);
 
-  // Filter TV Shows based on search and genre selection
-  const filteredShows = tvShows.filter(show => {
+  // Filter movies based on search and genre selection
+  const filteredMovies = movies.filter(movie => {
     const matchesSearch = searchQuery.trim() === "" ||
-      show.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      show.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (show.language && show.language.toLowerCase().includes(searchQuery.toLowerCase()));
+      movie.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      movie.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (movie.language && movie.language.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesGenre = !selectedGenreId ||
-      show.genres.some(g => g.id === selectedGenreId);
+      movie.genres.some(g => g.id === selectedGenreId);
 
     return matchesSearch && matchesGenre;
   });
 
-  // Select a featured TV show for the main hero banner
-  const featuredShow = filteredShows.find(s => s.isPremium) || filteredShows[0];
+  // Select a featured movie for the main hero banner (first premium or first movie from filtered list)
+  const featuredMovie = filteredMovies.find(m => m.isPremium) || filteredMovies[0];
 
-  // Group TV shows by genre
-  const getShowsByGenre = (genreId) => {
-    return filteredShows.filter(show => 
-      show.genres.some(genre => genre.id === genreId)
+  // Group movies by genre (respecting search and filters)
+  const getMoviesByGenre = (genreId) => {
+    return filteredMovies.filter(movie => 
+      movie.genres.some(genre => genre.id === genreId)
     );
   };
 
@@ -100,13 +100,13 @@ export default function TvShows() {
   return (
     <div className="relative min-h-screen bg-[#0d0e12] pb-24 text-white overflow-x-hidden pt-16">
       {/* Hero Banner Section */}
-      {featuredShow ? (
+      {featuredMovie ? (
         <div className="relative h-[450px] md:h-[550px] w-full overflow-hidden">
           {/* Background Image / Backdrop */}
           <div className="absolute inset-0">
             <OptimizedImage
-              src={featuredShow.backdropUrl || featuredShow.thumbnailUrl || heroBannerFallback}
-              alt={featuredShow.title}
+              src={featuredMovie.backdropUrl || featuredMovie.thumbnailUrl || heroBannerFallback}
+              alt={featuredMovie.title}
               className="h-full w-full object-cover object-center transform scale-105 transition-transform duration-1000"
             />
             {/* Gradient overlays to blend with background */}
@@ -117,26 +117,33 @@ export default function TvShows() {
           {/* Hero Content */}
           <div className="absolute bottom-12 left-0 right-0 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 z-10">
             <div className="max-w-2xl text-left">
-              {featuredShow.isPremium && (
+              {featuredMovie.isPremium && (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 mb-4 uppercase tracking-widest">
                   Premium
                 </span>
               )}
               <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white uppercase leading-none mb-3">
-                {featuredShow.title}
+                {featuredMovie.title}
               </h1>
               <p className="text-gray-300 text-xs sm:text-sm mb-6 leading-relaxed font-light line-clamp-3">
-                {featuredShow.description}
+                {featuredMovie.description}
               </p>
 
               {/* Action Buttons */}
               <div className="flex flex-wrap gap-3">
                 <button
-                  onClick={() => navigate(featuredShow.tmdbId ? `/movie/tmdb-tv-${featuredShow.tmdbId}` : `/movie/tv-${featuredShow.id}`)}
+                  onClick={() => navigate(`/watch/${featuredMovie.id}`)}
                   className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-[#e50914] to-red-600 hover:from-red-600 hover:to-red-700 text-white rounded-xl font-bold shadow-[0_4px_20px_rgba(229,9,20,0.4)] hover:shadow-[0_4px_25px_rgba(229,9,20,0.6)] transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-xs"
                 >
                   <FiPlay className="h-4 w-4 fill-current" />
-                  View Seasons
+                  Play Stream
+                </button>
+                <button
+                  onClick={() => navigate(`/movie/${featuredMovie.id}`)}
+                  className="flex items-center gap-1.5 px-6 py-2.5 bg-white/10 hover:bg-white/15 text-white rounded-xl font-bold border border-white/10 backdrop-blur-md transform hover:-translate-y-0.5 transition-all duration-300 cursor-pointer text-xs"
+                >
+                  <FiInfo className="h-4.5 w-4.5" />
+                  More Details
                 </button>
               </div>
             </div>
@@ -145,8 +152,8 @@ export default function TvShows() {
       ) : (
         <div className="relative h-[30vh] w-full flex items-center justify-center bg-gradient-to-tr from-[#12131a] to-[#0d0e12] border-b border-white/5">
           <div className="text-center">
-            <h1 className="text-2xl font-black uppercase text-white tracking-widest">TV SHOWS<span className="text-[#e50914]">CATALOG</span></h1>
-            <p className="text-gray-400 text-xs mt-2">Welcome! Explore our premium TV series below.</p>
+            <h1 className="text-2xl font-black uppercase text-white tracking-widest">MOVIES<span className="text-[#e50914]">CATALOG</span></h1>
+            <p className="text-gray-400 text-xs mt-2">Welcome! Explore our premium movies below.</p>
           </div>
         </div>
       )}
@@ -155,19 +162,19 @@ export default function TvShows() {
 
       {/* Catalog Grid */}
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-12 space-y-12 pb-24">
-        {tvShows.length === 0 ? (
+        {movies.length === 0 ? (
           <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
-            <h3 className="text-xl font-bold text-white mb-2">No TV Shows Found</h3>
+            <h3 className="text-xl font-bold text-white mb-2">No Movies Found</h3>
             <p className="text-gray-400 font-light text-sm">
-              Our TV shows library is currently empty. Check back later for premium series.
+              Our movies library is currently empty. Check back later for premium titles.
             </p>
           </div>
         ) : (
           // Default Rows View
           <div className="space-y-12 text-left">
             {genres.map((genre) => {
-              const genreShows = getShowsByGenre(genre.id);
-              if (genreShows.length === 0) return null;
+              const genreMovies = getMoviesByGenre(genre.id);
+              if (genreMovies.length === 0) return null;
 
               return (
                 <div key={genre.id} className="space-y-4">
@@ -176,21 +183,21 @@ export default function TvShows() {
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {genreShows.map((show) => (
+                    {genreMovies.map((movie) => (
                       <div
-                        key={show.id}
-                        onClick={() => navigate(show.tmdbId ? `/movie/tmdb-tv-${show.tmdbId}` : `/movie/tv-${show.id}`)}
+                        key={movie.id}
+                        onClick={() => navigate(`/movie/${movie.id}`)}
                         className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                       >
-                        {show.thumbnailUrl ? (
+                        {movie.thumbnailUrl ? (
                           <OptimizedImage
-                            src={show.thumbnailUrl}
-                            alt={show.title}
+                            src={movie.thumbnailUrl}
+                            alt={movie.title}
                             className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                           />
                         ) : (
                           <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{show.title.substring(0, 15)}</span>
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
                           </div>
                         )}
 
@@ -198,15 +205,15 @@ export default function TvShows() {
 
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
                           <div className="flex items-center justify-between mb-1.5">
-                            {show.isPremium && (
+                            {movie.isPremium && (
                               <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                                 ⭐ PREMIUM
                               </span>
                             )}
-                            <span className="text-xs font-medium text-gray-400 ml-auto">{show.releaseYear}</span>
+                            <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
                           </div>
                           <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                            {show.title}
+                            {movie.title}
                           </h4>
                         </div>
                       </div>
@@ -217,28 +224,28 @@ export default function TvShows() {
             })}
 
             {/* Uncategorized Titles Row */}
-            {tvShows.filter(s => s.genres.length === 0).length > 0 && (
+            {movies.filter(m => m.genres.length === 0).length > 0 && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between border-l-4 border-red-500 pl-3">
-                  <h3 className="text-xl font-bold tracking-tight text-white">Uncategorized TV Shows</h3>
+                  <h3 className="text-xl font-bold tracking-tight text-white">Uncategorized Titles</h3>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                  {tvShows.filter(s => s.genres.length === 0).map((show) => (
+                  {movies.filter(m => m.genres.length === 0).map((movie) => (
                     <div
-                      key={show.id}
-                      onClick={() => navigate(show.tmdbId ? `/movie/tmdb-tv-${show.tmdbId}` : `/movie/tv-${show.id}`)}
+                      key={movie.id}
+                      onClick={() => navigate(`/movie/${movie.id}`)}
                       className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                     >
-                      {show.thumbnailUrl ? (
+                      {movie.thumbnailUrl ? (
                         <OptimizedImage
-                          src={show.thumbnailUrl}
-                          alt={show.title}
+                          src={movie.thumbnailUrl}
+                          alt={movie.title}
                           className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                         />
                       ) : (
                         <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                          <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{show.title.substring(0, 15)}</span>
+                          <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
                         </div>
                       )}
 
@@ -246,15 +253,15 @@ export default function TvShows() {
 
                       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
                         <div className="flex items-center justify-between mb-1.5">
-                          {show.isPremium && (
+                          {movie.isPremium && (
                             <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                               ⭐ PREMIUM
                             </span>
                           )}
-                          <span className="text-xs font-medium text-gray-400 ml-auto">{show.releaseYear}</span>
+                          <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
                         </div>
                         <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                          {show.title}
+                          {movie.title}
                         </h4>
                       </div>
                     </div>
@@ -291,7 +298,7 @@ export default function TvShows() {
               <input
                 type="text"
                 autoFocus
-                placeholder="Search TV shows..."
+                placeholder="Search movies..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-14 pr-12 py-3.5 rounded-2xl border border-white/10 bg-white/5 text-sm text-white placeholder-gray-400 outline-none focus:border-red-500/40 focus:bg-white/10 transition-all shadow-xl"
@@ -338,37 +345,37 @@ export default function TvShows() {
               <div className="space-y-6">
                 <div className="flex items-center gap-3 border-l-4 border-red-500 pl-3">
                   <h3 className="text-xl font-bold tracking-tight text-white uppercase">
-                    TV Show Results ({filteredShows.length})
+                    Movie Results ({filteredMovies.length})
                   </h3>
                 </div>
 
-                {filteredShows.length === 0 ? (
+                {filteredMovies.length === 0 ? (
                   <div className="rounded-2xl border border-white/5 bg-white/5 p-12 text-center max-w-md mx-auto">
-                    <h3 className="text-sm font-bold text-white mb-1">No Matching TV Shows</h3>
+                    <h3 className="text-sm font-bold text-white mb-1">No Matching Movies</h3>
                     <p className="text-gray-400 font-light text-xs">
-                      We couldn't find any TV shows matching your search term or genre choice.
+                      We couldn't find any movies matching your search term or genre choice.
                     </p>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {filteredShows.map((show) => (
+                    {filteredMovies.map((movie) => (
                       <div
-                        key={show.id}
+                        key={movie.id}
                         onClick={() => {
                           handleCloseSearch();
-                          navigate(show.tmdbId ? `/movie/tmdb-tv-${show.tmdbId}` : `/movie/tv-${show.id}`);
+                          navigate(`/movie/${movie.id}`);
                         }}
                         className="group relative h-48 rounded-2xl overflow-hidden border border-white/5 cursor-pointer shadow-lg transform hover:scale-[1.03] transition-all duration-500 ease-out"
                       >
-                        {show.thumbnailUrl ? (
+                        {movie.thumbnailUrl ? (
                           <OptimizedImage
-                            src={show.thumbnailUrl}
-                            alt={show.title}
+                            src={movie.thumbnailUrl}
+                            alt={movie.title}
                             className="absolute inset-0 h-full w-full object-cover opacity-80 group-hover:opacity-100 transition-opacity duration-300"
                           />
                         ) : (
                           <div className="absolute inset-0 bg-gradient-to-tr from-gray-950 to-red-950/40 opacity-80 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{show.title.substring(0, 15)}</span>
+                            <span className="text-sm font-bold text-gray-500 uppercase tracking-widest">{movie.title.substring(0, 15)}</span>
                           </div>
                         )}
 
@@ -376,15 +383,15 @@ export default function TvShows() {
 
                         <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-transparent flex flex-col justify-end p-5 z-10">
                           <div className="flex items-center justify-between mb-1.5">
-                            {show.isPremium && (
+                            {movie.isPremium && (
                               <span className="text-[9px] font-extrabold bg-amber-500 text-black px-1.5 py-0.5 rounded-md uppercase tracking-wider">
                                 ⭐ PREMIUM
                               </span>
                             )}
-                            <span className="text-xs font-medium text-gray-400 ml-auto">{show.releaseYear}</span>
+                            <span className="text-xs font-medium text-gray-400 ml-auto">{movie.releaseYear} • {movie.duration}m</span>
                           </div>
                           <h4 className="text-white font-bold text-base leading-tight group-hover:text-red-400 transition-colors duration-300">
-                            {show.title}
+                            {movie.title}
                           </h4>
                         </div>
                       </div>

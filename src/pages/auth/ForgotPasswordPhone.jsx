@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth } from "../../firebase";
 import { FiPhone, FiAlertCircle, FiCheckCircle, FiArrowLeft } from "react-icons/fi";
 
 export default function ForgotPasswordPhone() {

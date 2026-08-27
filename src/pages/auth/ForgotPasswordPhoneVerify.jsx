@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { FiPhone, FiAlertCircle, FiCheckCircle, FiArrowLeft } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth } from "../../firebase";
 
 export default function ForgotPasswordPhoneVerify() {
   const [otpCode, setOtpCode] = useState("");

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { sendEmailVerification } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth } from "../../firebase";
 import { FiMail, FiCheckCircle, FiAlertCircle, FiLogOut, FiRefreshCw } from "react-icons/fi";
 
 export default function EmailVerification() {

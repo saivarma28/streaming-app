@@ -13,7 +13,7 @@ import {
   searchTmdb
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
-import OptimizedImage from "../components/OptimizedImage";
+import OptimizedImage from "../components/ui/OptimizedImage";
 
 // Static mapping of TMDB genre IDs to human-readable names
 const TMDB_GENRES = {

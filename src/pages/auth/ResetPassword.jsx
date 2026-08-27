@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { auth } from "../firebase";
+import { auth } from "../../firebase";
 import { verifyPasswordResetCode, confirmPasswordReset } from "firebase/auth";
 import { FiLock, FiCheckCircle, FiAlertCircle, FiArrowLeft } from "react-icons/fi";
 

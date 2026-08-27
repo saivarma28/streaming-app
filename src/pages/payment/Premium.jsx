@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { createPaymentOrder, verifyPayment } from "../services/apiService";
+import { useAuth } from "../../context/AuthContext";
+import { createPaymentOrder, verifyPayment } from "../../services/apiService";
 import { FiCheck, FiLoader, FiAlertCircle, FiAward, FiTv, FiZap, FiLock, FiStar, FiArrowLeft } from "react-icons/fi";
 
 function loadRazorpayScript() {

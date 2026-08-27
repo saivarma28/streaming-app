@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { FiLogOut, FiUser, FiMail, FiAlertCircle, FiShield, FiCheckCircle } from "react-icons/fi";
 
 export default function Profile() {

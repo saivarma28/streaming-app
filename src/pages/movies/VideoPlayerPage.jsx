@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, useLocation, useNavigate } from "react-router-dom";
 import { FiArrowLeft, FiAlertCircle, FiLock } from "react-icons/fi";
-import { useAuth } from "../context/AuthContext";
-import { getMovieById, updateWatchHistory, getEpisodeById } from "../services/apiService";
-import VideoPlayer from "../components/VideoPlayer";
+import { useAuth } from "../../context/AuthContext";
+import { getMovieById, updateWatchHistory, getEpisodeById } from "../../services/apiService";
+import VideoPlayer from "../../components/movie/VideoPlayer";
 
 export default function VideoPlayerPage() {
   const { id } = useParams();

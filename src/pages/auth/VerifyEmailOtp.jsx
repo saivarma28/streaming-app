@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate, Navigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
-import { verifyEmailOtp, sendEmailOtp, syncUser } from "../services/apiService";
+import { useAuth } from "../../context/AuthContext";
+import { verifyEmailOtp, sendEmailOtp, syncUser } from "../../services/apiService";
 import { FiMail, FiAlertCircle, FiCheckCircle, FiRefreshCw, FiLogOut } from "react-icons/fi";
 
 export default function VerifyEmailOtp() {

@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../../context/AuthContext";
 import { FiMail, FiLock, FiPhone, FiAlertCircle, FiCheckCircle } from "react-icons/fi";
 import { FcGoogle } from "react-icons/fc";
 import { RecaptchaVerifier } from "firebase/auth";
-import { auth } from "../firebase";
-import { syncUser, checkPhoneExists } from "../services/apiService";
+import { auth } from "../../firebase";
+import { syncUser, checkPhoneExists } from "../../services/apiService";
 
 export default function Login() {
   const [step, setStep] = useState(1); // 1 = Details input, 2 = Phone OTP verification
