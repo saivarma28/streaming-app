@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { FiLogOut, FiUser, FiMail, FiAlertCircle, FiShield, FiCheckCircle } from "react-icons/fi";
-import InstallAppButton from "../components/InstallAppButton";
 
 export default function Profile() {
   const { currentUser, role, logout } = useAuth();
@@ -118,9 +117,6 @@ export default function Profile() {
             </Link>
           </div>
         )}
-
-        {/* PWA Installation Section */}
-        <InstallAppButton className="mb-6" />
 
         {/* Action Button */}
         <button

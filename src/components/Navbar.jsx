@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar, FiDownload } from "react-icons/fi";
+import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar, FiDownload, FiShare, FiPlusSquare } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { usePWAInstall } from "../hooks/usePWAInstall";
 
@@ -14,8 +14,9 @@ export default function Navbar() {
 
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showInstallFallback, setShowInstallFallback] = useState(false);
   const { currentUser, dbUser, role, logout } = useAuth();
-  const { canInstall, isStandalone, promptInstall } = usePWAInstall();
+  const { canInstall, isStandalone, isIOS, isSafari, promptInstall } = usePWAInstall();
   const expiry = dbUser?.premiumExpiryDate || dbUser?.subscriptionExpiryDate;
   const isPremiumUser = dbUser && (dbUser.role === "admin" || (dbUser.isPremium === true && expiry && new Date(expiry) > new Date()));
   const navigate = useNavigate();
@@ -283,37 +284,42 @@ export default function Navbar() {
                 </NavLink>
               ))}
               <div className="h-[1px] bg-white/5 my-3"></div>
-              {/* Profile link in mobile */}
+              {/* Account link in mobile hamburger menu drawer */}
               <Link
                 to="/profile"
                 onClick={() => setIsMobileMenuOpen(false)}
-                className="flex items-center gap-3 py-2 px-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300"
+                className="flex items-center gap-3 py-2 px-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300 font-medium"
               >
                 {currentUser.photoURL ? (
                   <img
                     src={currentUser.photoURL}
                     alt={currentUser.displayName || "User"}
-                    className="h-8 w-8 rounded-full border border-white/10 object-cover"
+                    className="h-5 w-5 rounded-full border border-white/10 object-cover"
                   />
                 ) : (
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-tr from-[#e50914] to-orange-600 text-white font-bold text-xs border border-white/10">
-                    {getUserInitials()}
-                  </div>
+                  <FiUser className="h-5 w-5" />
                 )}
-                <span className="font-semibold text-sm">{currentUser.displayName || "My Profile"}</span>
+                <span className="text-base">Account</span>
               </Link>
-              {!isStandalone && canInstall && (
+              
+              {/* Install App Link */}
+              {!isStandalone && (
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
-                    promptInstall();
+                    if (canInstall) {
+                      promptInstall();
+                    } else {
+                      setShowInstallFallback(true);
+                    }
                   }}
-                  className="w-full flex items-center gap-3 py-2 px-3 rounded-lg text-emerald-400 hover:bg-white/5 transition-all duration-300 cursor-pointer text-left font-medium"
+                  className="w-full flex items-center gap-3 py-2 px-3 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 transition-all duration-300 cursor-pointer text-left font-medium"
                 >
-                  <FiDownload className="h-5 w-5 animate-pulse" />
+                  <FiDownload className="h-5 w-5 text-red-500 animate-pulse" />
                   Install StreamApp
                 </button>
               )}
+              
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -343,6 +349,61 @@ export default function Navbar() {
               </Link>
             </div>
           )}
+        </div>
+      )}
+
+      {/* iOS/Android Manual Install Fallback Modal */}
+      {showInstallFallback && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-2xl border border-white/5 bg-[#12131a] p-6 shadow-2xl relative text-left">
+            <button
+              onClick={() => setShowInstallFallback(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white transition-colors cursor-pointer"
+            >
+              <FiX className="h-5 w-5" />
+            </button>
+            
+            <div className="flex items-center gap-3 mb-4">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#e50914] to-orange-600 flex items-center justify-center text-white shadow-[0_0_15px_rgba(229,9,20,0.3)]">
+                <FiDownload className="h-5 w-5" />
+              </div>
+              <h3 className="text-lg font-bold text-white uppercase tracking-wider">Install StreamApp</h3>
+            </div>
+
+            {isIOS ? (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-400 leading-relaxed font-light">
+                  iOS Safari does not support automatic downloads. Follow these steps to install StreamApp on your iPhone/iPad:
+                </p>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3 flex flex-col gap-2.5 text-xs text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-[10px]">1</span>
+                    <span className="font-light">Tap the share button <FiShare className="h-3.5 w-3.5 text-sky-400 inline shrink-0" /> at the bottom of Safari.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-[10px]">2</span>
+                    <span className="font-light">Select <strong className="text-white font-semibold">Add to Home Screen</strong> <FiPlusSquare className="h-3.5 w-3.5 text-emerald-400 inline shrink-0" /> from the menu.</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-xs text-gray-400 leading-relaxed font-light">
+                  Direct PWA installation is not supported by your current browser settings. Follow these steps to install StreamApp on Android:
+                </p>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-4 text-xs text-gray-300 leading-relaxed font-light">
+                  Tap Chrome's options menu <strong className="text-white font-semibold">⋮</strong> in the top-right corner and select <strong className="text-white font-semibold">"Install app"</strong> or <strong className="text-white font-semibold">"Add to Home screen"</strong>.
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => setShowInstallFallback(false)}
+              className="mt-6 w-full py-2.5 bg-[#e50914] hover:bg-red-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all cursor-pointer shadow-lg"
+            >
+              Got It
+            </button>
+          </div>
         </div>
       )}
     </nav>
