@@ -54,10 +54,8 @@ export default function InstallAppButton({ className = "" }) {
       deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
       console.log(`[PWA] Install prompt outcome: ${outcome}`);
-      // Clear the prompt reference after interaction
       setDeferredPrompt(null);
     } else {
-      // Toggle the clean manual instructions banner below the card
       setShowFallback(true);
     }
   };
@@ -68,28 +66,32 @@ export default function InstallAppButton({ className = "" }) {
   }
 
   return (
-    <div className={`rounded-2xl border border-white/5 bg-[#12131a]/85 p-6 sm:p-8 backdrop-blur-xl shadow-2xl text-left ${className}`}>
-      <div className="flex flex-col md:flex-row items-center md:items-start justify-between gap-6">
-        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+    <div className={`w-full rounded-2xl border border-white/5 bg-[#12131a]/85 p-6 md:p-8 backdrop-blur-xl shadow-2xl text-left ${className}`}>
+      <div className="flex flex-col md:flex-row items-center justify-between gap-6 md:gap-8">
+        
+        {/* Left side: Icon + Texts */}
+        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
           {/* Download Icon Wrapper */}
           <div className="h-12 w-12 rounded-2xl bg-gradient-to-tr from-[#e50914] to-orange-600 flex items-center justify-center text-white shrink-0 shadow-[0_4px_15px_rgba(229,9,20,0.4)]">
             <FiDownload className="h-6 w-6" />
           </div>
           
           {/* Card Text Content */}
-          <div>
-            <h3 className="text-lg font-black uppercase text-white tracking-wider">DOWNLOAD STREAMAPP</h3>
-            <p className="text-sm text-gray-400 font-light mt-1 max-w-xl leading-relaxed">
+          <div className="text-center sm:text-left">
+            <h3 className="text-lg font-black uppercase text-white tracking-wider whitespace-nowrap">
+              DOWNLOAD STREAMAPP
+            </h3>
+            <p className="text-sm text-gray-400 font-light mt-1 md:whitespace-nowrap">
               Install StreamApp on your device for a faster and better experience.
             </p>
           </div>
         </div>
 
         {/* Action Button */}
-        <div className="w-full md:w-auto shrink-0 self-center md:self-start">
+        <div className="w-full md:w-auto shrink-0">
           <button
             onClick={handleInstallClick}
-            className="w-full md:w-auto px-6 py-3 bg-[#e50914] hover:bg-red-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-all duration-300 shadow-[0_4px_15px_rgba(229,9,20,0.3)] hover:shadow-[0_4px_20px_rgba(229,9,20,0.5)] active:scale-97 cursor-pointer"
+            className="w-full md:w-auto px-6 py-3 bg-[#e50914] hover:bg-red-700 text-white text-sm font-bold uppercase tracking-wider rounded-xl transition-all duration-300 shadow-[0_4px_15px_rgba(229,9,20,0.3)] hover:shadow-[0_4px_20px_rgba(229,9,20,0.5)] active:scale-97 cursor-pointer whitespace-nowrap"
           >
             Download StreamApp
           </button>
