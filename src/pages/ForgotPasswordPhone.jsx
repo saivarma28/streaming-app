@@ -22,7 +22,12 @@ export default function ForgotPasswordPhone() {
   useEffect(() => {
     return () => {
       if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Error cleaning up recaptcha on unmount:", e);
+        }
+        recaptchaVerifierRef.current = null;
       }
     };
   }, []);
@@ -59,20 +64,38 @@ export default function ForgotPasswordPhone() {
     try {
       setLoading(true);
 
-      // Create invisible reCAPTCHA container if not exists
-      if (!recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "forgot-recaptcha-container", {
-          size: "invisible",
-          callback: () => {},
-          "expired-callback": () => {
-            setError("reCAPTCHA expired. Please try again.");
-            if (recaptchaVerifierRef.current) {
-              recaptchaVerifierRef.current.clear();
-              recaptchaVerifierRef.current = null;
-            }
-          }
-        });
+      // Reset any existing recaptcha instance and clean the container DOM element
+      // to avoid "reCAPTCHA has already been rendered in this element" error.
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Error clearing old recaptcha verifier:", e);
+        }
+        recaptchaVerifierRef.current = null;
       }
+
+      const container = document.getElementById("forgot-recaptcha-container");
+      if (container) {
+        container.innerHTML = "";
+      }
+
+      // Create a fresh reCAPTCHA container instance
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "forgot-recaptcha-container", {
+        size: "invisible",
+        callback: () => {},
+        "expired-callback": () => {
+          setError("reCAPTCHA expired. Please try again.");
+          if (recaptchaVerifierRef.current) {
+            try {
+              recaptchaVerifierRef.current.clear();
+            } catch (e) {
+              console.warn("Error clearing expired recaptcha verifier:", e);
+            }
+            recaptchaVerifierRef.current = null;
+          }
+        }
+      });
 
       const confirmationResult = await signInWithPhone(fullPhoneNumber, recaptchaVerifierRef.current);
       

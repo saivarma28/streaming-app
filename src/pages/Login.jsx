@@ -38,7 +38,12 @@ export default function Login() {
   useEffect(() => {
     return () => {
       if (recaptchaVerifierRef.current) {
-        recaptchaVerifierRef.current.clear();
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Error cleaning up recaptcha on unmount:", e);
+        }
+        recaptchaVerifierRef.current = null;
       }
     };
   }, []);
@@ -116,13 +121,27 @@ export default function Login() {
           return;
         }
 
-        // Setup invisible reCAPTCHA verifier
-        if (!recaptchaVerifierRef.current) {
-          recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
-            size: "invisible",
-            callback: () => {}
-          });
+        // Reset any existing recaptcha instance and clean the container DOM element
+        // to avoid "reCAPTCHA has already been rendered in this element" error.
+        if (recaptchaVerifierRef.current) {
+          try {
+            recaptchaVerifierRef.current.clear();
+          } catch (e) {
+            console.warn("Error clearing old recaptcha verifier:", e);
+          }
+          recaptchaVerifierRef.current = null;
         }
+
+        const container = document.getElementById("recaptcha-container");
+        if (container) {
+          container.innerHTML = "";
+        }
+
+        // Setup invisible reCAPTCHA verifier instance
+        recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "recaptcha-container", {
+          size: "invisible",
+          callback: () => {}
+        });
 
         const confirmationResult = await signInWithPhone(fullPhoneNumber, recaptchaVerifierRef.current);
         confirmationResultRef.current = confirmationResult;

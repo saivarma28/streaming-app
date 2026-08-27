@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, Navigate } from "react-router-dom";
 import { FiPhone, FiAlertCircle, FiCheckCircle, FiArrowLeft } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
@@ -14,6 +14,22 @@ export default function ForgotPasswordPhoneVerify() {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [resending, setResending] = useState(false);
+
+  const recaptchaVerifierRef = useRef(null);
+
+  // Cleanup reCAPTCHA on unmount
+  useEffect(() => {
+    return () => {
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Error cleaning up recaptcha on unmount:", e);
+        }
+        recaptchaVerifierRef.current = null;
+      }
+    };
+  }, []);
 
   const { signInWithPhone } = useAuth();
   const navigate = useNavigate();
@@ -73,13 +89,28 @@ export default function ForgotPasswordPhoneVerify() {
     setResending(true);
 
     try {
+      // Reset any existing recaptcha instance and clean the container DOM element
+      if (recaptchaVerifierRef.current) {
+        try {
+          recaptchaVerifierRef.current.clear();
+        } catch (e) {
+          console.warn("Error clearing old recaptcha verifier:", e);
+        }
+        recaptchaVerifierRef.current = null;
+      }
+
+      const container = document.getElementById("forgot-verify-recaptcha");
+      if (container) {
+        container.innerHTML = "";
+      }
+
       // Re-setup recaptcha
-      const recaptchaVerifier = new RecaptchaVerifier(auth, "forgot-verify-recaptcha", {
+      recaptchaVerifierRef.current = new RecaptchaVerifier(auth, "forgot-verify-recaptcha", {
         size: "invisible",
         callback: () => {}
       });
 
-      const confirmationResult = await signInWithPhone(phoneNumber, recaptchaVerifier);
+      const confirmationResult = await signInWithPhone(phoneNumber, recaptchaVerifierRef.current);
       window.forgotPasswordConfirmation = confirmationResult;
       setMessage("A fresh SMS OTP code has been sent to your mobile number!");
     } catch (err) {
