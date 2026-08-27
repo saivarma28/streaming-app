@@ -14,6 +14,7 @@ import {
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 import OptimizedImage from "../components/OptimizedImage";
+import InstallAppButton from "../components/InstallAppButton";
 
 // Static mapping of TMDB genre IDs to human-readable names
 const TMDB_GENRES = {
@@ -386,7 +387,12 @@ export default function Home() {
         </div>
       )}
 
-
+      {/* PWA Install Banner */}
+      {!searchQuery && !selectedGenreId && (
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 mt-8">
+          <InstallAppButton />
+        </div>
+      )}
 
       {/* Continue Watching Section */}
       {continueWatchingList.length > 0 && !searchQuery && !selectedGenreId && (
