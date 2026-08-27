@@ -3,6 +3,8 @@ import { BrowserRouter } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
 import Navbar from './components/Navbar'
 import AppRoutes from './routes/AppRoutes'
+import PWAUpdater from './components/PWAUpdater'
+import OfflineBanner from './components/OfflineBanner'
 
 function App() {
   return (
@@ -13,6 +15,8 @@ function App() {
           <main className="pt-0">
             <AppRoutes />
           </main>
+          <PWAUpdater />
+          <OfflineBanner />
         </div>
       </AuthProvider>
     </BrowserRouter>

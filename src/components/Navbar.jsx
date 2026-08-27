@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { Link, NavLink, useNavigate, useLocation } from "react-router-dom";
-import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar } from "react-icons/fi";
+import { FiSearch, FiBell, FiUser, FiMenu, FiX, FiLogOut, FiStar, FiDownload } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 
 export default function Navbar() {
   const { pathname } = useLocation();
@@ -14,6 +15,7 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { currentUser, dbUser, role, logout } = useAuth();
+  const { canInstall, isStandalone, promptInstall } = usePWAInstall();
   const expiry = dbUser?.premiumExpiryDate || dbUser?.subscriptionExpiryDate;
   const isPremiumUser = dbUser && (dbUser.role === "admin" || (dbUser.isPremium === true && expiry && new Date(expiry) > new Date()));
   const navigate = useNavigate();
@@ -300,6 +302,18 @@ export default function Navbar() {
                 )}
                 <span className="font-semibold text-sm">{currentUser.displayName || "My Profile"}</span>
               </Link>
+              {!isStandalone && canInstall && (
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    promptInstall();
+                  }}
+                  className="w-full flex items-center gap-3 py-2 px-3 rounded-lg text-emerald-400 hover:bg-white/5 transition-all duration-300 cursor-pointer text-left font-medium"
+                >
+                  <FiDownload className="h-5 w-5 animate-pulse" />
+                  Install StreamApp
+                </button>
+              )}
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);

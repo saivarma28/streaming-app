@@ -1,10 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import { FiLogOut, FiUser, FiMail, FiAlertCircle, FiShield, FiCheckCircle } from "react-icons/fi";
+import { FiLogOut, FiUser, FiMail, FiAlertCircle, FiShield, FiCheckCircle, FiDownload, FiShare, FiPlusSquare } from "react-icons/fi";
+import { usePWAInstall } from "../hooks/usePWAInstall";
 
 export default function Profile() {
   const { currentUser, role, logout } = useAuth();
+  const { canInstall, isStandalone, isIOS, isSafari, promptInstall } = usePWAInstall();
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
@@ -115,6 +117,49 @@ export default function Profile() {
             >
               Go to Admin Dashboard
             </Link>
+          </div>
+        )}
+
+        {/* PWA Installation Section */}
+        {!isStandalone && (canInstall || (isIOS && isSafari)) && (
+          <div className="mb-6 rounded-2xl border border-white/5 bg-gradient-to-b from-white/[0.03] to-transparent p-5 text-left">
+            <div className="flex items-center gap-2 mb-3">
+              <FiDownload className="h-4.5 w-4.5 text-[#e50914]" />
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Install StreamApp</span>
+            </div>
+            
+            {canInstall && (
+              <>
+                <p className="text-xs text-gray-500 font-light mb-4 leading-relaxed">
+                  Install StreamApp on your device for a fast, full-screen native app experience and quick access.
+                </p>
+                <button
+                  onClick={promptInstall}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg border border-red-500/25 bg-red-500/5 hover:bg-red-500/10 text-red-400 text-xs font-bold uppercase tracking-wider transition-all duration-300 cursor-pointer"
+                >
+                  <FiDownload className="h-4 w-4" />
+                  Install App
+                </button>
+              </>
+            )}
+
+            {isIOS && isSafari && (
+              <div className="space-y-3">
+                <p className="text-xs text-gray-500 font-light leading-relaxed">
+                  Get StreamApp on your iPhone/iPad. Install manually using Safari:
+                </p>
+                <div className="bg-white/5 border border-white/5 rounded-xl p-3.5 flex flex-col gap-2.5 text-xs text-gray-300">
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-[10px]">1</span>
+                    <span className="flex items-center gap-1 font-light">Tap the share button <FiShare className="h-4 w-4 text-sky-400 inline shrink-0" /> in Safari.</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-red-500/10 border border-red-500/20 text-red-500 font-bold text-[10px]">2</span>
+                    <span className="flex items-center gap-1 font-light">Select <strong className="text-white font-semibold ml-1">Add to Home Screen</strong> <FiPlusSquare className="h-4 w-4 text-emerald-400 inline shrink-0 ml-1" />.</span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

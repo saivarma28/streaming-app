@@ -8,3 +8,35 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
 }
+
+/* Safe area notch adjustments for standalone PWA mobile mode */
+@media (display-mode: standalone) {
+  nav {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.5rem) !important;
+  }
+  
+  main {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 4rem) !important;
+  }
+  
+  body {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+}
+
+/* Custom animations for premium PWA experience */
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
