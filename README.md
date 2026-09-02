@@ -1,16 +1,67 @@
-# React + Vite
+# Streaming App (Hotstar Clone)
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Full-stack OTT streaming web application with video streaming, Firebase authentication (email OTP & phone verification), Razorpay subscription payments, and comprehensive Admin Dashboard.
 
-Currently, two official plugins are available:
+---
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Project Structure
 
-## React Compiler
+```
+hotstar-clone/
+├── frontend/             # React 19 + Vite + Tailwind CSS + PWA
+│   ├── public/           # Static assets, SVG icons, PWA manifests
+│   ├── src/              # React components, pages, routes, hooks, context
+│   ├── .env              # Frontend environment variables
+│   ├── package.json      # Frontend dependencies & scripts
+│   └── vite.config.js    # Vite & PWA configuration
+│
+├── backend/              # Node.js + Express + MongoDB + Firebase Admin
+│   ├── api/              # Serverless entry point
+│   ├── config/           # MongoDB and Firebase Admin initialization
+│   ├── controllers/      # Route controllers (Auth, Movies, TV, Payment, Users, etc.)
+│   ├── middleware/       # JWT Auth and Admin verification middleware
+│   ├── routes/           # Express REST API route definitions
+│   ├── services/         # Cloudflare R2, TMDB proxy, Razorpay, Nodemailer
+│   ├── uploads/          # Local media fallback storage
+│   ├── utils/            # OTP in-memory store and helper utilities
+│   ├── .env              # Backend environment variables
+│   ├── app.js            # Express application setup
+│   ├── server.js         # Server entry point
+│   └── package.json      # Backend dependencies & scripts
+│
+├── .gitignore            # Root git ignore rules
+└── README.md             # Project documentation
+```
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the Oxlint configuration
+## Quick Start
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
+### 1. Backend Setup
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+The backend server will start on `http://localhost:5000`.
+
+### 2. Frontend Setup
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+The frontend Vite server will start on `http://localhost:5173`.
+
+---
+
+## Key Features
+
+- **Authentication**: Email OTP verification, phone number login/verification, password reset workflows.
+- **Content Catalog**: Movies, TV Shows, TMDB integration proxy, custom categories and genres.
+- **Video Player**: HLS.js streaming support with responsive player controls and watch history tracking.
+- **Monetization**: Razorpay test integration for subscription plans.
+- **Admin Dashboard**: Content management, video presigned URL generation (Cloudflare R2), user management, audit logs.
+- **PWA Ready**: Offline support, service worker caching, and install prompts.
