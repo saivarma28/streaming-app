@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { FiPlay, FiInfo, FiPlus, FiChevronRight, FiChevronLeft, FiSearch, FiX } from "react-icons/fi";
+import { useNavigate } from "react-router-dom";
+import { FiPlay, FiInfo, FiChevronRight, FiChevronLeft, FiSearch, FiX } from "react-icons/fi";
 import { useAuth } from "../context/AuthContext";
 import { 
   getMovies, 
   getGenres, 
   getWatchHistory,
-  getTmdbPopularMovies,
   getTmdbTrendingMovies,
-  getTmdbTopRatedMovies,
-  getTmdbPopularTv,
   searchTmdb
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
@@ -27,7 +24,7 @@ const TMDB_GENRES = {
   10751: "Family",
   14: "Fantasy",
   36: "History",
-  27: "Horror",
+  30: "Horror",
   10402: "Music",
   9648: "Mystery",
   10749: "Romance",
@@ -46,7 +43,6 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGenreId, setSelectedGenreId] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
   const navigate = useNavigate();
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -77,10 +73,6 @@ export default function Home() {
 
   // TMDB integration states
   const [tmdbTrending, setTmdbTrending] = useState([]);
-  const [tmdbPopularMovies, setTmdbPopularMovies] = useState([]);
-  const [tmdbTopRated, setTmdbTopRated] = useState([]);
-  const [tmdbPopularTv, setTmdbPopularTv] = useState([]);
-  const [tmdbError, setTmdbError] = useState(false);
   const [tmdbSearchResults, setTmdbSearchResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [tmdbLoading, setTmdbLoading] = useState(true);
@@ -117,31 +109,18 @@ export default function Home() {
         setGenres(genresData.genres || []);
         setWatchHistory(historyData.history || []);
 
-        // Load TMDB catalog blocks in parallel (fail-safe error isolation)
+        // Load TMDB trending for hero banner
         try {
-          let hasTmdbError = false;
-          const [trendingData, popularData, topRatedData, popularTvData] = await Promise.all([
-            getTmdbTrendingMovies(token).catch(e => { console.warn("TMDB trending load error:", e.message); hasTmdbError = true; return { results: [] }; }),
-            getTmdbPopularMovies(token).catch(e => { console.warn("TMDB popular load error:", e.message); hasTmdbError = true; return { results: [] }; }),
-            getTmdbTopRatedMovies(token).catch(e => { console.warn("TMDB top rated load error:", e.message); hasTmdbError = true; return { results: [] }; }),
-            getTmdbPopularTv(token).catch(e => { console.warn("TMDB popular TV load error:", e.message); hasTmdbError = true; return { results: [] }; })
-          ]);
-          
+          const trendingData = await getTmdbTrendingMovies(token).catch(e => {
+            console.warn("TMDB trending load error:", e.message);
+            return { results: [] };
+          });
           setTmdbTrending(trendingData.results || []);
-          setTmdbPopularMovies(popularData.results || []);
-          setTmdbTopRated(topRatedData.results || []);
-          setTmdbPopularTv(popularTvData.results || []);
-          
-          if (hasTmdbError || (!trendingData.results && !popularData.results && !topRatedData.results && !popularTvData.results)) {
-            setTmdbError(true);
-          }
         } catch (tmdbErr) {
           console.warn("Failed to retrieve TMDB sections:", tmdbErr.message);
-          setTmdbError(true);
         }
       } catch (err) {
         console.error("Failed to load catalog:", err);
-        setError("Could not load catalog. Please check your connection.");
       } finally {
         setLoading(false);
         setTmdbLoading(false);

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import { 
-  FiSearch, FiDownload, FiVideo, FiTv, FiLoader, FiAlertCircle, FiCheckCircle 
+  FiSearch, FiDownload, FiVideo, FiTv, FiAlertCircle, FiCheckCircle 
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import { 
@@ -16,7 +15,6 @@ import {
 
 export default function AdminTmdb() {
   const { currentUser } = useAuth();
-  const navigate = useNavigate();
 
   const [searchType, setSearchType] = useState("movie"); // "movie" | "tv"
   const [query, setQuery] = useState("");
