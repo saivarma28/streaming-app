@@ -1,15 +1,16 @@
-import { getDb, getNextSequenceValue } from "../config/mongodb.js";
-import admin from "../config/firebaseAdmin.js";
+import { UserService } from "../services/userService.js";
+import { AuditLogModel } from "../models/AuditLog.js";
 
 /**
- * Syncs the authenticated Firebase user with the local MongoDB database.
- * If user does not exist, creates them. If they do exist, updates dynamic profile details.
- * 
+ * Controller for user profile synchronization, updates, and administration
+ */
+
+/**
+ * Syncs the authenticated Firebase user with MongoDB.
  * POST /api/users/sync
  */
 export async function syncUser(req, res) {
-  // Identity details come strictly from the verified middleware context (never from body!)
-  const { firebaseUid, email, name, photoURL, emailVerified } = req.user;
+  const { email } = req.user;
 
   if (!email) {
     return res.status(400).json({
@@ -19,78 +20,7 @@ export async function syncUser(req, res) {
   }
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    // 1. Look up existing user profile in MongoDB
-    let user = await userCollection.findOne({ firebaseUid });
-
-    if (!user) {
-      // Check if user already exists by email first (avoid unique constraint violation)
-      user = await userCollection.findOne({ email });
-
-      if (user) {
-        // If found by email, update their firebaseUid and sync details
-        const shouldBeAdmin = email === "saivarma9333@gmail.com";
-        await userCollection.updateOne(
-          { email },
-          {
-            $set: {
-              firebaseUid,
-              name: name || user.name,
-              photoURL: photoURL || user.photoURL,
-              isEmailVerified: emailVerified || user.isEmailVerified,
-              role: shouldBeAdmin ? "admin" : user.role,
-              updatedAt: new Date()
-            }
-          }
-        );
-        user = await userCollection.findOne({ email });
-        console.log(`Database sync: Associated existing MongoDB user by email (${user.email}) to new uid ${firebaseUid}`);
-      } else {
-        // Promote to admin if they are the first user in database or their email matches
-        const userCount = await userCollection.countDocuments();
-        const isAdmin = userCount === 0 || email === "saivarma9333@gmail.com";
-        const newId = await getNextSequenceValue("users");
-
-        // 2. Create a new user record
-        const newUserDoc = {
-          id: newId,
-          firebaseUid,
-          email,
-          name: name || "User",
-          photoURL,
-          isEmailVerified: emailVerified,
-          isPhoneVerified: false,
-          phoneNumber: null,
-          role: isAdmin ? "admin" : "user",
-          createdAt: new Date(),
-          updatedAt: new Date()
-        };
-
-        await userCollection.insertOne(newUserDoc);
-        user = newUserDoc;
-        console.log(`Database sync: Created new MongoDB user (${user.role}) for uid ${firebaseUid}`);
-      }
-    } else {
-      // Update existing user details, and ensure saivarma9333@gmail.com gets upgraded to admin
-      const shouldBeAdmin = email === "saivarma9333@gmail.com";
-      await userCollection.updateOne(
-        { firebaseUid },
-        {
-          $set: {
-            name: name || user.name,
-            photoURL: photoURL || user.photoURL,
-            isEmailVerified: emailVerified || user.isEmailVerified,
-            role: shouldBeAdmin ? "admin" : user.role,
-            updatedAt: new Date()
-          }
-        }
-      );
-      user = await userCollection.findOne({ firebaseUid });
-      console.log(`Database sync: Updated existing MongoDB user (${user.role}) for uid ${firebaseUid}`);
-    }
-
+    const user = await UserService.syncUser(req.user);
     return res.status(200).json({
       success: true,
       user: {
@@ -120,18 +50,14 @@ export async function syncUser(req, res) {
 }
 
 /**
- * Gets the current authenticated user's profile details from MongoDB.
- * 
+ * Gets the current authenticated user's profile from MongoDB.
  * GET /api/users/me
  */
 export async function getMe(req, res) {
   const { firebaseUid } = req.user;
 
   try {
-    const db = getDb();
-    const user = await db.collection("users").findOne({ firebaseUid });
-
-    console.log("getMe Controller - Querying for UID:", firebaseUid, "Result Found:", !!user);
+    const user = await UserService.getProfileByFirebaseUid(firebaseUid);
 
     if (!user) {
       return res.status(404).json({
@@ -170,8 +96,6 @@ export async function getMe(req, res) {
 
 /**
  * Updates the current authenticated user's profile details.
- * Only permits updating safe fields: name, photoURL, phoneNumber, role.
- * 
  * PUT /api/users/me
  */
 export async function updateMe(req, res) {
@@ -179,24 +103,7 @@ export async function updateMe(req, res) {
   const { name, photoURL, phoneNumber } = req.body;
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    const updateFields = {};
-    if (name !== undefined) updateFields.name = name;
-    if (photoURL !== undefined) updateFields.photoURL = photoURL;
-    if (phoneNumber !== undefined) {
-      updateFields.phoneNumber = phoneNumber;
-      updateFields.isPhoneVerified = true;
-    }
-    updateFields.updatedAt = new Date();
-
-    await userCollection.updateOne(
-      { firebaseUid },
-      { $set: updateFields }
-    );
-
-    const updatedUser = await userCollection.findOne({ firebaseUid });
+    const updatedUser = await UserService.updateProfile(firebaseUid, { name, photoURL, phoneNumber });
 
     return res.status(200).json({
       success: true,
@@ -232,40 +139,14 @@ export async function updateMe(req, res) {
  */
 export async function getAllUsers(req, res) {
   try {
-    const db = getDb();
-    const users = await db.collection("users")
-      .find({})
-      .sort({ createdAt: -1 })
-      .toArray();
-
-    return res.status(200).json({
-      success: true,
-      users
-    });
+    const users = await UserService.getAllUsers();
+    return res.status(200).json({ success: true, users });
   } catch (error) {
     console.error("getAllUsers Controller Error:", error.message);
     return res.status(500).json({
       success: false,
       message: "An error occurred while retrieving user list."
     });
-  }
-}
-
-// Helper to log administrative actions to MongoDB
-async function logAdminAction(db, req, action, targetUserEmail) {
-  try {
-    const adminEmail = req.user?.email || "Unknown Admin";
-    const adminName = req.dbUser?.name || req.user?.name || "Admin";
-    const logDoc = {
-      adminEmail,
-      adminName,
-      action,
-      targetUser: targetUserEmail,
-      timestamp: new Date()
-    };
-    await db.collection("audit_logs").insertOne(logDoc);
-  } catch (err) {
-    console.error("Failed to write admin audit log:", err.message);
   }
 }
 
@@ -284,81 +165,35 @@ export async function adminCreateUser(req, res) {
   }
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    // Prevent duplicate email accounts
-    const existingUser = await userCollection.findOne({ email: email.toLowerCase() });
-    if (existingUser) {
-      return res.status(400).json({
-        success: false,
-        message: "A user with this email address already exists in the system."
-      });
-    }
-
-    // Create user securely in Firebase
-    const firebaseUser = await admin.auth().createUser({
-      email: email.toLowerCase(),
-      password,
-      displayName: name,
-      emailVerified: true,
-      disabled: isDisabled === true
-    });
-
-    const newId = await getNextSequenceValue("users");
-    const expiryDate = premiumExpiryDate ? new Date(premiumExpiryDate) : null;
-
-    const newUserDoc = {
-      id: newId,
-      firebaseUid: firebaseUser.uid,
-      email: email.toLowerCase(),
-      name,
-      photoURL: null,
-      isEmailVerified: true,
-      isPhoneVerified: false,
-      phoneNumber: null,
-      role: role || "user",
-      isPremium: isPremium === true,
-      premiumExpiryDate: expiryDate,
-      subscriptionStatus: isPremium === true ? "active" : null,
-      subscriptionExpiryDate: expiryDate,
-      isDisabled: isDisabled === true,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-
-    await userCollection.insertOne(newUserDoc);
-
-    // Audit log
-    await logAdminAction(db, req, `Created user ${name}`, email.toLowerCase());
+    const user = await UserService.adminCreateUser(
+      { email: req.user.email, name: req.dbUser?.name || req.user.name },
+      { name, email, password, role, isPremium, premiumExpiryDate, isDisabled }
+    );
 
     return res.status(201).json({
       success: true,
       message: "User created successfully",
       user: {
-        id: newId,
-        firebaseUid: firebaseUser.uid,
-        name,
-        email: email.toLowerCase(),
-        role: role || "user",
-        isPremium: isPremium === true,
-        premiumExpiryDate: expiryDate,
-        isDisabled: isDisabled === true,
-        createdAt: newUserDoc.createdAt
+        id: user.id,
+        firebaseUid: user.firebaseUid,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isPremium: user.isPremium,
+        premiumExpiryDate: user.premiumExpiryDate,
+        isDisabled: user.isDisabled,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
     console.error("adminCreateUser Error:", error.message);
-    let errorMsg = "An error occurred while creating the user.";
+    let errorMsg = error.message || "An error occurred while creating the user.";
     if (error.code === "auth/email-already-exists") {
       errorMsg = "A user with this email address already exists in Firebase Auth.";
     } else if (error.code === "auth/invalid-password") {
       errorMsg = "Password must be at least 6 characters.";
     }
-    return res.status(500).json({
-      success: false,
-      message: errorMsg
-    });
+    return res.status(500).json({ success: false, message: errorMsg });
   }
 }
 
@@ -371,52 +206,11 @@ export async function adminUpdateUser(req, res) {
   const { name, role, isPremium, premiumExpiryDate, isDisabled } = req.body;
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    const user = await userCollection.findOne({ firebaseUid });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User profile not found in local database."
-      });
-    }
-
-    const firebaseUpdates = {};
-    if (name !== undefined) firebaseUpdates.displayName = name;
-    if (isDisabled !== undefined) firebaseUpdates.disabled = isDisabled === true;
-
-    if (Object.keys(firebaseUpdates).length > 0) {
-      await admin.auth().updateUser(firebaseUid, firebaseUpdates);
-    }
-
-    const updateFields = {};
-    if (name !== undefined) updateFields.name = name;
-    if (role !== undefined) updateFields.role = role;
-    if (isPremium !== undefined) {
-      updateFields.isPremium = isPremium === true;
-      updateFields.subscriptionStatus = isPremium === true ? "active" : null;
-    }
-    if (premiumExpiryDate !== undefined) {
-      const expiry = premiumExpiryDate ? new Date(premiumExpiryDate) : null;
-      updateFields.premiumExpiryDate = expiry;
-      updateFields.subscriptionExpiryDate = expiry;
-    }
-    if (isDisabled !== undefined) {
-      updateFields.isDisabled = isDisabled === true;
-    }
-    updateFields.updatedAt = new Date();
-
-    await userCollection.updateOne({ firebaseUid }, { $set: updateFields });
-
-    const changes = [];
-    if (name !== undefined && name !== user.name) changes.push(`renamed to ${name}`);
-    if (role !== undefined && role !== user.role) changes.push(`changed role to ${role}`);
-    if (isPremium !== undefined && isPremium !== user.isPremium) changes.push(`changed status to ${isPremium ? "Premium" : "Normal"}`);
-    if (isDisabled !== undefined && isDisabled !== user.isDisabled) changes.push(isDisabled ? "disabled account" : "enabled account");
-
-    const actionText = changes.length > 0 ? `Updated properties: ${changes.join(", ")}` : `Updated profile of ${user.name}`;
-    await logAdminAction(db, req, actionText, user.email);
+    await UserService.adminUpdateUser(
+      { email: req.user.email, name: req.dbUser?.name || req.user.name },
+      firebaseUid,
+      { name, role, isPremium, premiumExpiryDate, isDisabled }
+    );
 
     return res.status(200).json({
       success: true,
@@ -424,9 +218,10 @@ export async function adminUpdateUser(req, res) {
     });
   } catch (error) {
     console.error("adminUpdateUser Error:", error.message);
-    return res.status(500).json({
+    const status = error.message.includes("not found") ? 404 : 500;
+    return res.status(status).json({
       success: false,
-      message: "An error occurred while updating the user."
+      message: error.message || "An error occurred while updating the user."
     });
   }
 }
@@ -447,22 +242,11 @@ export async function adminResetPassword(req, res) {
   }
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    const user = await userCollection.findOne({ firebaseUid });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found in local database."
-      });
-    }
-
-    await admin.auth().updateUser(firebaseUid, {
-      password: newPassword
-    });
-
-    await logAdminAction(db, req, "Reset password", user.email);
+    await UserService.adminResetPassword(
+      { email: req.user.email, name: req.dbUser?.name || req.user.name },
+      firebaseUid,
+      newPassword
+    );
 
     return res.status(200).json({
       success: true,
@@ -472,7 +256,7 @@ export async function adminResetPassword(req, res) {
     console.error("adminResetPassword Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Failed to reset password in Firebase Auth."
+      message: error.message || "Failed to reset password."
     });
   }
 }
@@ -485,21 +269,10 @@ export async function adminDeleteUser(req, res) {
   const { firebaseUid } = req.params;
 
   try {
-    const db = getDb();
-    const userCollection = db.collection("users");
-
-    const user = await userCollection.findOne({ firebaseUid });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found in local database."
-      });
-    }
-
-    await admin.auth().deleteUser(firebaseUid);
-    await userCollection.deleteOne({ firebaseUid });
-
-    await logAdminAction(db, req, `Deleted user ${user.name}`, user.email);
+    await UserService.adminDeleteUser(
+      { email: req.user.email, name: req.dbUser?.name || req.user.name },
+      firebaseUid
+    );
 
     return res.status(200).json({
       success: true,
@@ -509,7 +282,7 @@ export async function adminDeleteUser(req, res) {
     console.error("adminDeleteUser Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Failed to delete user."
+      message: error.message || "Failed to delete user."
     });
   }
 }
@@ -520,17 +293,8 @@ export async function adminDeleteUser(req, res) {
  */
 export async function getAuditLogs(req, res) {
   try {
-    const db = getDb();
-    const logs = await db.collection("audit_logs")
-      .find({})
-      .sort({ timestamp: -1 })
-      .limit(100)
-      .toArray();
-
-    return res.status(200).json({
-      success: true,
-      logs
-    });
+    const logs = await AuditLogModel.getRecentLogs(100);
+    return res.status(200).json({ success: true, logs });
   } catch (error) {
     console.error("getAuditLogs Error:", error.message);
     return res.status(500).json({
@@ -539,4 +303,3 @@ export async function getAuditLogs(req, res) {
     });
   }
 }
-

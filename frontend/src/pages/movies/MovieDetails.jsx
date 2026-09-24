@@ -5,16 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getMovieById, getWatchHistory, getTmdbMovieDetails, getTmdbTvDetails, getTvShowById, getSeasons, getEpisodes } from "../../services/apiService";
 import heroBannerFallback from "../../assets/hero_banner.png";
 import OptimizedImage from "../../components/ui/OptimizedImage";
-
-/**
- * Parses and extracts a 11-character YouTube video ID from various link styles.
- */
-const getYouTubeId = (url) => {
-  if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
-  const match = url.match(regExp);
-  return (match && match[2].length === 11) ? match[2] : null;
-};
+import { getYouTubeId } from "../../utils/videoHelpers";
 
 export default function MovieDetails() {
   const { id } = useParams();

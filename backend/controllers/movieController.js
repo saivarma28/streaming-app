@@ -1,69 +1,24 @@
-import { getDb, getNextSequenceValue } from "../config/mongodb.js";
-import { uploadToGCS } from "../services/googleCloudStorage.js";
-import { createTranscodingJob, getTranscodingJobStatus } from "../services/googleTranscoder.js";
-import { uploadToR2, s3, isR2Configured, bucketNameExport } from "../services/cloudflareR2.js";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import fs from "fs";
-import path from "path";
+import { MovieService } from "../services/movieService.js";
+import { normalizeMediaUrl } from "../utils/mediaUrlHelper.js";
 
-// Helper to dynamically normalize private R2 URLs to public ones using environment prefix
-export function normalizeMovieUrls(movie) {
-  if (!movie) return movie;
-  const publicPrefix = process.env.R2_PUBLIC_URL_PREFIX;
-  if (publicPrefix && movie.hlsUrl && movie.hlsUrl.includes("r2.cloudflarestorage.com")) {
-    const cleanPrefix = publicPrefix.replace(/\/$/, "");
-    const parts = movie.hlsUrl.split("/streaming-app/");
-    if (parts.length > 1) {
-      movie.hlsUrl = `${cleanPrefix}/${parts[1]}`;
-    }
-  }
-  return movie;
-}
+// Re-export normalizeMovieUrls for backward compatibility
+export const normalizeMovieUrls = normalizeMediaUrl;
+
+/**
+ * Controller for movie operations
+ */
 
 /**
  * Retrieves movies list.
- * Regular users only see published movies. Admins can see all if query.adminView === 'true'.
- * Supports optional filtering by genreId.
- * 
  * GET /api/movies
  */
 export async function getMovies(req, res) {
   const { adminView, genreId } = req.query;
+  const firebaseUid = req.user?.firebaseUid;
 
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-    let whereClause = { isPublished: true };
-
-    // If adminView is requested, verify user role first
-    if (adminView === "true" && req.user?.firebaseUid) {
-      const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
-      if (user && user.role === "admin") {
-        whereClause = {}; // Admins can view all records (both published and unpublished)
-      }
-    }
-
-    // Apply optional genre filter
-    if (genreId) {
-      whereClause.genreIds = parseInt(genreId);
-    }
-
-    const movies = await movieCollection.find(whereClause).sort({ createdAt: -1 }).toArray();
-
-    // Populate genres relation
-    for (let movie of movies) {
-      const genres = await db.collection("genres")
-        .find({ id: { $in: movie.genreIds || [] } })
-        .toArray();
-      movie.genres = genres;
-      normalizeMovieUrls(movie);
-    }
-
-    return res.status(200).json({
-      success: true,
-      movies
-    });
+    const movies = await MovieService.getMovies({ adminView, genreId, firebaseUid });
+    return res.status(200).json({ success: true, movies });
   } catch (error) {
     console.error("getMovies Controller Error:", error.message);
     return res.status(500).json({
@@ -79,81 +34,23 @@ export async function getMovies(req, res) {
  */
 export async function getMovieById(req, res) {
   const { id } = req.params;
+  const firebaseUid = req.user?.firebaseUid;
 
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-
-    const movie = await movieCollection.findOne({ id: parseInt(id) });
-
-    if (!movie) {
-      return res.status(404).json({
-        success: false,
-        message: "Movie not found."
-      });
-    }
-
-    // Check permissions if movie is unpublished
-    if (!movie.isPublished) {
-      let isAuthorized = false;
-      if (req.user?.firebaseUid) {
-        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
-        if (user && user.role === "admin") {
-          isAuthorized = true;
-        }
-      }
-      if (!isAuthorized) {
-        return res.status(403).json({
-          success: false,
-          message: "Forbidden. Access to unpublished media restricted."
-        });
-      }
-    }
-
-    // Check Premium Access restriction
-    if (movie.isPremium) {
-      let isPremiumAuthorized = false;
-      if (req.user?.firebaseUid) {
-        const user = await db.collection("users").findOne({ firebaseUid: req.user.firebaseUid });
-        if (user) {
-          const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
-          if (user.role === "admin" || (user.isPremium === true && expiry && new Date(expiry) > new Date())) {
-            isPremiumAuthorized = true;
-          }
-        }
-      }
-      if (!isPremiumAuthorized) {
-        return res.status(403).json({
-          success: false,
-          message: "Premium subscription required"
-        });
-      }
-    }
-
-    // Populate genres relation
-    const genres = await db.collection("genres")
-      .find({ id: { $in: movie.genreIds || [] } })
-      .toArray();
-    movie.genres = genres;
-    normalizeMovieUrls(movie);
-
-    return res.status(200).json({
-      success: true,
-      movie
-    });
+    const movie = await MovieService.getMovieById(id, firebaseUid);
+    return res.status(200).json({ success: true, movie });
   } catch (error) {
     console.error("getMovieById Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "An error occurred while retrieving movie details."
+      message: error.message || "An error occurred while retrieving movie details."
     });
   }
 }
 
 /**
  * Creates a new movie. (Admin only)
- * Optionally handles uploading a video file directly to Cloudflare R2 / GCS.
- * 
  * POST /api/movies
  */
 export async function createMovie(req, res) {
@@ -173,7 +70,6 @@ export async function createMovie(req, res) {
     videoUrl
   } = req.body;
 
-  // Validation
   if (!title || !description || !duration || !releaseYear) {
     return res.status(400).json({
       success: false,
@@ -181,7 +77,6 @@ export async function createMovie(req, res) {
     });
   }
 
-  // Parse types from multipart/form-data
   const parsedDuration = parseInt(duration);
   const parsedReleaseYear = parseInt(releaseYear);
   const parsedIsPremium = isPremium === "true" || isPremium === true;
@@ -194,7 +89,6 @@ export async function createMovie(req, res) {
     });
   }
 
-  // Parse genreIds if transferred as JSON string or comma-separated list
   let parsedGenreIds = [];
   if (genreIds) {
     try {
@@ -212,149 +106,35 @@ export async function createMovie(req, res) {
   }
 
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-    const newId = await getNextSequenceValue("movies");
-
-    // 1. Insert Movie Record into MongoDB
-    const newMovieDoc = {
-      id: newId,
+    const movieData = {
       title,
       description,
       thumbnailUrl: thumbnailUrl || null,
       backdropUrl: backdropUrl || null,
       trailerUrl: trailerUrl || null,
       videoUrl: videoUrl || null,
-      hlsUrl: videoUrl || null,
-      sourceVideoPath: videoUrl || null,
-      transcoderJobName: null,
       duration: parsedDuration,
       releaseYear: parsedReleaseYear,
       maturityRating: maturityRating || null,
       language: language || "English",
       isPremium: parsedIsPremium,
       isPublished: parsedIsPublished,
-      transcodingStatus: req.file ? "UPLOADING" : "READY",
-      genreIds: parsedGenreIds,
-      createdAt: new Date(),
-      updatedAt: new Date()
+      genreIds: parsedGenreIds
     };
 
-    await movieCollection.insertOne(newMovieDoc);
-    let movie = newMovieDoc;
-
-    // 2. Process Video File Upload
-    if (req.file) {
-      try {
-        const isR2Configured = process.env.R2_ENDPOINT ? true : false;
-        const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
-
-        if (isR2Configured) {
-          const destinationPath = `movies/${movie.id}/video_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
-          const publicUrl = await uploadToR2(req.file.buffer, destinationPath, req.file.mimetype);
-          
-          await movieCollection.updateOne(
-            { id: movie.id },
-            {
-              $set: {
-                sourceVideoPath: publicUrl,
-                transcodingStatus: "READY",
-                hlsUrl: publicUrl
-              }
-            }
-          );
-          movie = await movieCollection.findOne({ id: movie.id });
-        } else if (isGcpConfigured) {
-          const destinationPath = `movies/${movie.id}/source_${Date.now()}_${req.file.originalname}`;
-          const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
-          
-          const outputFolder = `movies/${movie.id}/transcoded/`;
-          const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
-          
-          // Create Transcoder job
-          const jobInfo = await createTranscodingJob(inputUri, outputUri);
-          
-          const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
-          
-          await movieCollection.updateOne(
-            { id: movie.id },
-            {
-              $set: {
-                sourceVideoPath: inputUri,
-                transcoderJobName: jobInfo.jobName,
-                transcodingStatus: "PROCESSING",
-                hlsUrl: hlsUrl
-              }
-            }
-          );
-          movie = await movieCollection.findOne({ id: movie.id });
-        } else {
-          // Local fallback: save file to backend/uploads/movies
-          console.warn("WARNING: Google Cloud & Cloudflare R2 not configured. Using local file storage fallback.");
-          
-          const uploadDir = path.resolve("uploads/movies");
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-          
-          const filename = `movie_${movie.id}_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
-          const filepath = path.join(uploadDir, filename);
-          fs.writeFileSync(filepath, req.file.buffer);
-          
-          const localUrl = `http://localhost:5000/uploads/movies/${filename}`;
-          
-          await movieCollection.updateOne(
-            { id: movie.id },
-            {
-              $set: {
-                sourceVideoPath: filepath,
-                transcodingStatus: "READY",
-                hlsUrl: localUrl
-              }
-            }
-          );
-          movie = await movieCollection.findOne({ id: movie.id });
-        }
-      } catch (uploadError) {
-        console.error("Upload/Transcode process failed:", uploadError.message);
-        // Mark status as FAILED
-        await movieCollection.updateOne(
-          { id: movie.id },
-          { $set: { transcodingStatus: "FAILED" } }
-        );
-        movie = await movieCollection.findOne({ id: movie.id });
-        
-        return res.status(500).json({
-          success: false,
-          message: `Video upload failed: ${uploadError.message}`,
-          movie
-        });
-      }
-    }
-
-    // Populate genres relation for response
-    const genres = await db.collection("genres")
-      .find({ id: { $in: movie.genreIds || [] } })
-      .toArray();
-    movie.genres = genres;
-
-    return res.status(201).json({
-      success: true,
-      movie
-    });
+    const movie = await MovieService.createMovie(movieData, req.file);
+    return res.status(201).json({ success: true, movie });
   } catch (error) {
     console.error("createMovie Controller Error:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Failed to create movie record."
+      message: error.message || "Failed to create movie record."
     });
   }
 }
 
 /**
  * Updates an existing movie record. (Admin only)
- * Optionally handles uploading/replacing a video file.
- * 
  * PUT /api/movies/:id
  */
 export async function updateMovie(req, res) {
@@ -375,160 +155,49 @@ export async function updateMovie(req, res) {
     videoUrl
   } = req.body;
 
+  const updateFields = {};
+  if (title !== undefined) updateFields.title = title;
+  if (description !== undefined) updateFields.description = description;
+  if (thumbnailUrl !== undefined) updateFields.thumbnailUrl = thumbnailUrl;
+  if (backdropUrl !== undefined) updateFields.backdropUrl = backdropUrl;
+  if (trailerUrl !== undefined) updateFields.trailerUrl = trailerUrl;
+  if (duration !== undefined) updateFields.duration = parseInt(duration);
+  if (releaseYear !== undefined) updateFields.releaseYear = parseInt(releaseYear);
+  if (maturityRating !== undefined) updateFields.maturityRating = maturityRating;
+  if (language !== undefined) updateFields.language = language;
+  if (isPremium !== undefined) updateFields.isPremium = isPremium === "true" || isPremium === true;
+  if (isPublished !== undefined) updateFields.isPublished = isPublished === "true" || isPublished === true;
+  if (videoUrl !== undefined) {
+    updateFields.videoUrl = videoUrl;
+    updateFields.hlsUrl = videoUrl;
+    updateFields.sourceVideoPath = videoUrl;
+    updateFields.transcodingStatus = "READY";
+  }
+
+  if (genreIds !== undefined) {
+    try {
+      if (typeof genreIds === "string") {
+        updateFields.genreIds = JSON.parse(genreIds);
+      } else if (Array.isArray(genreIds)) {
+        updateFields.genreIds = genreIds;
+      }
+    } catch (e) {
+      updateFields.genreIds = String(genreIds)
+        .split(",")
+        .map((gid) => parseInt(gid.trim()))
+        .filter((gid) => !isNaN(gid));
+    }
+  }
+
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-    const existingMovie = await movieCollection.findOne({ id: parseInt(id) });
-
-    if (!existingMovie) {
-      return res.status(404).json({
-        success: false,
-        message: "Movie not found."
-      });
-    }
-
-    // Parse types
-    const parsedDuration = duration !== undefined ? parseInt(duration) : undefined;
-    const parsedReleaseYear = releaseYear !== undefined ? parseInt(releaseYear) : undefined;
-    const parsedIsPremium = isPremium !== undefined ? (isPremium === "true" || isPremium === true) : undefined;
-    const parsedIsPublished = isPublished !== undefined ? (isPublished === "true" || isPublished === true) : undefined;
-
-    // Parse genreIds if provided
-    let parsedGenreIds = undefined;
-    if (genreIds !== undefined) {
-      try {
-        if (typeof genreIds === "string") {
-          parsedGenreIds = JSON.parse(genreIds);
-        } else if (Array.isArray(genreIds)) {
-          parsedGenreIds = genreIds;
-        }
-      } catch (e) {
-        parsedGenreIds = String(genreIds)
-          .split(",")
-          .map((gid) => parseInt(gid.trim()))
-          .filter((gid) => !isNaN(gid));
-      }
-    }
-
-    let uploadResult = {};
-    // 1. Process Video File Upload
-    if (req.file) {
-      try {
-        // Temporarily mark status as UPLOADING during the file write process
-        await movieCollection.updateOne(
-          { id: existingMovie.id },
-          { $set: { transcodingStatus: "UPLOADING" } }
-        );
-
-        const isR2Configured = process.env.R2_ENDPOINT ? true : false;
-        const isGcpConfigured = process.env.GOOGLE_CLOUD_BUCKET_NAME ? true : false;
-
-        if (isR2Configured) {
-          const destinationPath = `movies/${existingMovie.id}/video_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
-          const publicUrl = await uploadToR2(req.file.buffer, destinationPath, req.file.mimetype);
-          
-          uploadResult = {
-            sourceVideoPath: publicUrl,
-            transcodingStatus: "READY",
-            hlsUrl: publicUrl
-          };
-        } else if (isGcpConfigured) {
-          const destinationPath = `movies/${existingMovie.id}/source_${Date.now()}_${req.file.originalname}`;
-          const inputUri = await uploadToGCS(req.file.buffer, destinationPath, req.file.mimetype);
-          
-          const outputFolder = `movies/${existingMovie.id}/transcoded/`;
-          const outputUri = `gs://${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}`;
-          
-          const jobInfo = await createTranscodingJob(inputUri, outputUri);
-          
-          const hlsUrl = `https://storage.googleapis.com/${process.env.GOOGLE_CLOUD_OUTPUT_BUCKET_NAME}/${outputFolder}master.m3u8`;
-          
-          uploadResult = {
-            sourceVideoPath: inputUri,
-            transcoderJobName: jobInfo.jobName,
-            transcodingStatus: "PROCESSING",
-            hlsUrl: hlsUrl
-          };
-        } else {
-          // Local fallback: save file to backend/uploads/movies
-          console.warn("WARNING: Google Cloud & Cloudflare R2 not configured. Using local file storage fallback.");
-          
-          const uploadDir = path.resolve("uploads/movies");
-          if (!fs.existsSync(uploadDir)) {
-            fs.mkdirSync(uploadDir, { recursive: true });
-          }
-          
-          const filename = `movie_${existingMovie.id}_${Date.now()}_${req.file.originalname.replace(/\s+/g, "_")}`;
-          const filepath = path.join(uploadDir, filename);
-          fs.writeFileSync(filepath, req.file.buffer);
-          
-          const localUrl = `http://localhost:5000/uploads/movies/${filename}`;
-          
-          uploadResult = {
-            sourceVideoPath: filepath,
-            transcodingStatus: "READY",
-            hlsUrl: localUrl
-          };
-        }
-      } catch (uploadError) {
-        console.error("Upload/Transcode process failed:", uploadError.message);
-        // Mark status as FAILED in DB
-        await movieCollection.updateOne(
-          { id: existingMovie.id },
-          { $set: { transcodingStatus: "FAILED" } }
-        );
-        return res.status(500).json({
-          success: false,
-          message: `Video upload replacement failed: ${uploadError.message}`
-        });
-      }
-    }
-
-    // 2. Perform database update
-    const updateFields = {};
-    if (title !== undefined) updateFields.title = title;
-    if (description !== undefined) updateFields.description = description;
-    if (thumbnailUrl !== undefined) updateFields.thumbnailUrl = thumbnailUrl;
-    if (backdropUrl !== undefined) updateFields.backdropUrl = backdropUrl;
-    if (trailerUrl !== undefined) updateFields.trailerUrl = trailerUrl;
-    if (parsedDuration !== undefined) updateFields.duration = parsedDuration;
-    if (parsedReleaseYear !== undefined) updateFields.releaseYear = parsedReleaseYear;
-    if (maturityRating !== undefined) updateFields.maturityRating = maturityRating;
-    if (language !== undefined) updateFields.language = language;
-    if (parsedIsPremium !== undefined) updateFields.isPremium = parsedIsPremium;
-    if (parsedIsPublished !== undefined) updateFields.isPublished = parsedIsPublished;
-    if (parsedGenreIds !== undefined) updateFields.genreIds = parsedGenreIds;
-    if (videoUrl !== undefined) {
-      updateFields.videoUrl = videoUrl;
-      updateFields.hlsUrl = videoUrl;
-      updateFields.sourceVideoPath = videoUrl;
-      updateFields.transcodingStatus = "READY";
-    }
-    Object.assign(updateFields, uploadResult);
-    updateFields.updatedAt = new Date();
-
-    await movieCollection.updateOne(
-      { id: parseInt(id) },
-      { $set: updateFields }
-    );
-
-    const updatedMovie = await movieCollection.findOne({ id: parseInt(id) });
-
-    // Populate genres relation for response
-    const genres = await db.collection("genres")
-      .find({ id: { $in: updatedMovie.genreIds || [] } })
-      .toArray();
-    updatedMovie.genres = genres;
-
-    return res.status(200).json({
-      success: true,
-      movie: updatedMovie
-    });
+    const updatedMovie = await MovieService.updateMovie(id, updateFields, req.file);
+    return res.status(200).json({ success: true, movie: updatedMovie });
   } catch (error) {
     console.error("updateMovie Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "Failed to update movie record."
+      message: error.message || "Failed to update movie record."
     });
   }
 }
@@ -541,31 +210,17 @@ export async function deleteMovie(req, res) {
   const { id } = req.params;
 
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-    const existingMovie = await movieCollection.findOne({ id: parseInt(id) });
-
-    if (!existingMovie) {
-      return res.status(404).json({
-        success: false,
-        message: "Movie not found."
-      });
-    }
-
-    await movieCollection.deleteOne({ id: parseInt(id) });
-
-    // Remove references in watch histories as well
-    await db.collection("watch_histories").deleteMany({ movieId: parseInt(id) });
-
+    await MovieService.deleteMovie(id);
     return res.status(200).json({
       success: true,
       message: "Movie deleted successfully from catalog."
     });
   } catch (error) {
     console.error("deleteMovie Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "Failed to delete movie."
+      message: error.message || "Failed to delete movie."
     });
   }
 }
@@ -578,63 +233,25 @@ export async function getTranscodingStatus(req, res) {
   const { id } = req.params;
 
   try {
-    const db = getDb();
-    const movieCollection = db.collection("movies");
-    const movie = await movieCollection.findOne({ id: parseInt(id) });
-
-    if (!movie) {
-      return res.status(404).json({
-        success: false,
-        message: "Movie not found."
-      });
-    }
-
-    // If status is PROCESSING and there is a transcoder job name, we poll Google Cloud
-    if (movie.transcodingStatus === "PROCESSING" && movie.transcoderJobName) {
-      try {
-        const jobStatus = await getTranscodingJobStatus(movie.transcoderJobName);
-        let newStatus = movie.transcodingStatus;
-
-        if (jobStatus.state === "SUCCEEDED") {
-          newStatus = "READY";
-        } else if (jobStatus.state === "FAILED") {
-          newStatus = "FAILED";
-        }
-
-        if (newStatus !== movie.transcodingStatus) {
-          await movieCollection.updateOne(
-            { id: parseInt(id) },
-            { $set: { transcodingStatus: newStatus } }
-          );
-          movie.transcodingStatus = newStatus;
-        }
-      } catch (err) {
-        console.warn("Failed to check Google Transcoding job status:", err.message);
-      }
-    }
-
-    return res.status(200).json({
-      success: true,
-      status: movie.transcodingStatus
-    });
+    const status = await MovieService.getTranscodingStatus(id);
+    return res.status(200).json({ success: true, status });
   } catch (error) {
     console.error("getTranscodingStatus Controller Error:", error.message);
-    return res.status(500).json({
+    const statusCode = error.status || 500;
+    return res.status(statusCode).json({
       success: false,
-      message: "An error occurred while fetching transcoding status."
+      message: error.message || "An error occurred while fetching transcoding status."
     });
   }
 }
 
+/**
+ * Generates presigned PUT URL for direct R2 uploads.
+ * POST /api/movies/presigned-url
+ */
 export async function getPresignedUploadUrl(req, res) {
-  if (!isR2Configured) {
-    return res.status(400).json({
-      success: false,
-      message: "Cloudflare R2 is not configured in the environment."
-    });
-  }
-
   const { filename, contentType } = req.body;
+
   if (!filename || !contentType) {
     return res.status(400).json({
       success: false,
@@ -643,38 +260,13 @@ export async function getPresignedUploadUrl(req, res) {
   }
 
   try {
-    const cleanFilename = filename.replace(/\s+/g, "_");
-    const destinationPath = `movies/uploads/video_${Date.now()}_${cleanFilename}`;
-
-    const command = new PutObjectCommand({
-      Bucket: bucketNameExport,
-      Key: destinationPath,
-      ContentType: contentType
-    });
-
-    // Generate PUT presigned URL valid for 1 hour (3600 seconds)
-    const presignedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-
-    let publicUrl;
-    if (process.env.R2_PUBLIC_URL_PREFIX) {
-      const prefix = process.env.R2_PUBLIC_URL_PREFIX.replace(/\/$/, "");
-      publicUrl = `${prefix}/${destinationPath}`;
-    } else {
-      publicUrl = `${process.env.R2_ENDPOINT}/${bucketNameExport}/${destinationPath}`;
-    }
-
-    return res.status(200).json({
-      success: true,
-      uploadUrl: presignedUrl,
-      videoUrl: publicUrl
-    });
+    const result = await MovieService.generatePresignedUploadUrl(filename, contentType);
+    return res.status(200).json({ success: true, ...result });
   } catch (error) {
     console.error("Failed to generate presigned R2 upload URL:", error.message);
     return res.status(500).json({
       success: false,
-      message: "Failed to generate presigned upload URL."
+      message: error.message || "Failed to generate presigned upload URL."
     });
   }
 }
-
-

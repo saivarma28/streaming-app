@@ -11,29 +11,7 @@ import {
 } from "../services/apiService";
 import heroBannerFallback from "../assets/hero_banner.png";
 import OptimizedImage from "../components/ui/OptimizedImage";
-
-// Static mapping of TMDB genre IDs to human-readable names
-const TMDB_GENRES = {
-  28: "Action",
-  12: "Adventure",
-  16: "Animation",
-  35: "Comedy",
-  80: "Crime",
-  99: "Documentary",
-  18: "Drama",
-  10751: "Family",
-  14: "Fantasy",
-  36: "History",
-  30: "Horror",
-  10402: "Music",
-  9648: "Mystery",
-  10749: "Romance",
-  878: "Sci-Fi",
-  10770: "TV Movie",
-  53: "Thriller",
-  10752: "War",
-  37: "Western"
-};
+import { TMDB_GENRES } from "../constants/tmdbGenres";
 
 export default function Home() {
   const { currentUser } = useAuth();

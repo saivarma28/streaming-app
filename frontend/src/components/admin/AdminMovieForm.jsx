@@ -5,7 +5,7 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import { 
-  getMovieById, createMovie, updateMovie, getGenres, getMoviePresignedUrl 
+  getMovieById, createMovie, updateMovie, getGenres, getMoviePresignedUrl, uploadToR2WithProgress 
 } from "../../services/apiService";
 
 export default function AdminMovieForm() {
@@ -127,38 +127,19 @@ export default function AdminMovieForm() {
       // Get PUT presigned URL from backend
       const { uploadUrl, videoUrl } = await getMoviePresignedUrl(token, videoFile.name, videoFile.type);
 
-      // Perform direct upload to Cloudflare R2 using XMLHttpRequest (required for upload progress)
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", uploadUrl, true);
-      xhr.setRequestHeader("Content-Type", videoFile.type);
+      // Perform direct upload to Cloudflare R2 with progress tracking
+      await uploadToR2WithProgress({
+        uploadUrl,
+        file: videoFile,
+        onProgress: (pct) => setUploadProgress(pct)
+      });
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const pct = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(pct);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          setUploadedVideoUrl(videoUrl);
-          setUploadStatus("success");
-        } else {
-          setUploadStatus("failed");
-          setError(`Direct upload failed with status code ${xhr.status}.`);
-        }
-      };
-
-      xhr.onerror = () => {
-        setUploadStatus("failed");
-        setError("Network error occurred during video file upload.");
-      };
-
-      xhr.send(videoFile);
+      setUploadedVideoUrl(videoUrl);
+      setUploadStatus("success");
     } catch (err) {
-      console.error("Direct upload initialization failed:", err);
+      console.error("Direct upload failed:", err);
       setUploadStatus("failed");
-      setError(err.message || "Failed to initialize video upload.");
+      setError(err.message || "Failed to complete video upload.");
     }
   };
 

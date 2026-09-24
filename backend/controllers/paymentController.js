@@ -1,84 +1,26 @@
-import razorpay from "../services/razorpayService.js";
-import { getDb } from "../config/mongodb.js";
-import crypto from "crypto";
-import { sendPaymentReceiptEmail } from "../services/emailService.js";
+import { PaymentService } from "../services/paymentService.js";
 
 /**
- * Creates a new Razorpay order for the premium subscription (₹99 = 9900 paise).
+ * Controller for Razorpay subscription orders and payment verification
+ */
+
+/**
+ * Creates a new Razorpay order for the premium subscription (₹99).
  * POST /api/payment/create-order
  */
 export async function createOrder(req, res) {
   const { firebaseUid } = req.user;
   const { plan } = req.body;
 
-  if (!razorpay) {
-    return res.status(500).json({
-      success: false,
-      message: "Razorpay payment integration is not configured on this server."
-    });
-  }
-
-  if (plan !== "premium") {
-    return res.status(400).json({
-      success: false,
-      message: "Invalid plan. Only 'premium' is supported."
-    });
-  }
-
   try {
-    const db = getDb();
-    const user = await db.collection("users").findOne({ firebaseUid });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User profile not found in local database."
-      });
-    }
-
-    // Optional: Check if user already has an active, unexpired subscription
-    const now = new Date();
-    const expiry = user.premiumExpiryDate || user.subscriptionExpiryDate;
-    if (user.isPremium && expiry && new Date(expiry) > now) {
-      return res.status(400).json({
-        success: false,
-        message: "You already have an active Premium subscription."
-      });
-    }
-
-    const amount = 9900; // ₹99 in paise
-    const currency = "INR";
-    const receipt = `rcpt_${Date.now()}_${firebaseUid.substring(0, 10)}`;
-
-    const options = {
-      amount,
-      currency,
-      receipt,
-      notes: {
-        firebaseUid,
-        plan: "premium"
-      }
-    };
-
-    const order = await razorpay.orders.create(options);
-
-    return res.status(200).json({
-      success: true,
-      orderId: order.id,
-      amount: order.amount,
-      currency: order.currency,
-      keyId: process.env.RAZORPAY_KEY_ID,
-      order: {
-        id: order.id,
-        amount: order.amount,
-        currency: order.currency
-      }
-    });
+    const orderData = await PaymentService.createOrder(firebaseUid, plan);
+    return res.status(200).json({ success: true, ...orderData });
   } catch (error) {
     console.error("createOrder Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "Failed to create Razorpay payment order: " + error.message
+      message: error.message || "Failed to create Razorpay payment order."
     });
   }
 }
@@ -91,129 +33,19 @@ export async function verifyPayment(req, res) {
   const { firebaseUid } = req.user;
   const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
 
-  if (!razorpay) {
-    return res.status(500).json({
-      success: false,
-      message: "Razorpay payment integration is not configured on this server."
-    });
-  }
-
-  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-    return res.status(400).json({
-      success: false,
-      message: "Missing Razorpay verification parameters in request."
-    });
-  }
-
   try {
-    // 1. Verify the signature server-side using HMAC SHA256 and KEY_SECRET
-    const text = razorpay_order_id + "|" + razorpay_payment_id;
-    const expectedSignature = crypto
-      .createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
-      .update(text)
-      .digest("hex");
-
-    if (expectedSignature !== razorpay_signature) {
-      return res.status(400).json({
-        success: false,
-        message: "Payment signature verification failed. Untrusted source."
-      });
-    }
-
-    const db = getDb();
-    const userCollection = db.collection("users");
-    const paymentCollection = db.collection("payments");
-
-    // 2. Prevent duplicate payment processing
-    const existingPayment = await paymentCollection.findOne({ paymentId: razorpay_payment_id });
-    if (existingPayment) {
-      return res.status(400).json({
-        success: false,
-        message: "This payment has already been processed and verified."
-      });
-    }
-
-    // 3. Find user and grant Premium status
-    const user = await userCollection.findOne({ firebaseUid });
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found. Cannot activate Premium subscription."
-      });
-    }
-
-    const premiumStartDate = new Date();
-    const premiumExpiryDate = new Date();
-    premiumExpiryDate.setDate(premiumExpiryDate.getDate() + 30); // 30 Days Expiration
-
-    // Update User Document
-    await userCollection.updateOne(
-      { firebaseUid },
-      {
-        $set: {
-          isPremium: true,
-          premiumStartDate,
-          premiumExpiryDate,
-          razorpayOrderId: razorpay_order_id,
-          razorpayPaymentId: razorpay_payment_id,
-          // Support both naming schemes for backward compatibility
-          subscriptionStatus: "active",
-          subscriptionStartDate: premiumStartDate,
-          subscriptionExpiryDate: premiumExpiryDate,
-          lastPaymentId: razorpay_payment_id,
-          lastOrderId: razorpay_order_id,
-          updatedAt: new Date()
-        }
-      }
-    );
-
-    // Save transaction info in payment log collection
-    await paymentCollection.insertOne({
-      userId: user.id,
-      firebaseUid,
-      paymentId: razorpay_payment_id,
-      orderId: razorpay_order_id,
-      amount: 9900,
-      currency: "INR",
-      status: "success",
-      createdAt: new Date()
+    const result = await PaymentService.verifyPayment(firebaseUid, {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature
     });
-
-    // Send payment receipt email (Requirement 6 & 7)
-    try {
-      const paymentDateFormatted = premiumStartDate.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      });
-      const expiryDateFormatted = premiumExpiryDate.toLocaleDateString("en-IN", {
-        day: "numeric",
-        month: "long",
-        year: "numeric"
-      });
-
-      await sendPaymentReceiptEmail(user.email, user.name || "Subscriber", {
-        paymentId: razorpay_payment_id,
-        orderId: razorpay_order_id,
-        paymentDate: paymentDateFormatted,
-        expiryDate: expiryDateFormatted
-      });
-      console.log(`SUCCESS: Payment receipt email sent to ${user.email}`);
-    } catch (emailError) {
-      console.error("WARNING: Failed to send payment receipt email:", emailError.message);
-    }
-
-    console.log(`Payment success: Upgraded user ${firebaseUid} to Premium. Payment ID: ${razorpay_payment_id}`);
-
-    return res.status(200).json({
-      success: true,
-      message: "Payment verified successfully. Premium membership activated!"
-    });
+    return res.status(200).json(result);
   } catch (error) {
     console.error("verifyPayment Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "An error occurred during payment verification."
+      message: error.message || "An error occurred during payment verification."
     });
   }
 }
@@ -226,50 +58,14 @@ export async function getSubscriptionStatus(req, res) {
   const { firebaseUid } = req.user;
 
   try {
-    const db = getDb();
-    const user = await db.collection("users").findOne({ firebaseUid });
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User profile not found."
-      });
-    }
-
-    const now = new Date();
-    let isPremium = user.isPremium || false;
-    let subscriptionStatus = user.subscriptionStatus || "none";
-    let premiumExpiryDate = user.premiumExpiryDate || user.subscriptionExpiryDate || null;
-
-    // Dynamic verification: Self-healing check if subscription expired
-    if (isPremium && premiumExpiryDate && new Date(premiumExpiryDate) < now) {
-      await db.collection("users").updateOne(
-        { firebaseUid },
-        {
-          $set: {
-            isPremium: false,
-            subscriptionStatus: "expired",
-            updatedAt: new Date()
-          }
-        }
-      );
-      isPremium = false;
-      subscriptionStatus = "expired";
-      console.log(`Subscription self-healed: Marked user ${firebaseUid} as expired.`);
-    }
-
-    return res.status(200).json({
-      success: true,
-      isPremium,
-      subscriptionStatus,
-      premiumExpiryDate,
-      subscriptionExpiryDate: premiumExpiryDate
-    });
+    const statusData = await PaymentService.getSubscriptionStatus(firebaseUid);
+    return res.status(200).json({ success: true, ...statusData });
   } catch (error) {
     console.error("getSubscriptionStatus Controller Error:", error.message);
-    return res.status(500).json({
+    const status = error.status || 500;
+    return res.status(status).json({
       success: false,
-      message: "Failed to retrieve subscription status."
+      message: error.message || "Failed to retrieve subscription status."
     });
   }
 }

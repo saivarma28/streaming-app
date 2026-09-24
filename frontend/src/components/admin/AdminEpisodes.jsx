@@ -5,7 +5,7 @@ import {
 } from "react-icons/fi";
 import { useAuth } from "../../context/AuthContext";
 import { 
-  getTvShowById, getEpisodes, createEpisode, updateEpisode, deleteEpisode, getTvShowPresignedUrl 
+  getTvShowById, getEpisodes, createEpisode, updateEpisode, deleteEpisode, getTvShowPresignedUrl, uploadToR2WithProgress 
 } from "../../services/apiService";
 
 export default function AdminEpisodes() {
@@ -140,38 +140,19 @@ export default function AdminEpisodes() {
       // Get PUT presigned URL from backend
       const { uploadUrl, videoUrl } = await getTvShowPresignedUrl(token, episodeVideoFile.name, episodeVideoFile.type);
 
-      // Perform direct upload to Cloudflare R2 using XMLHttpRequest (required for upload progress)
-      const xhr = new XMLHttpRequest();
-      xhr.open("PUT", uploadUrl, true);
-      xhr.setRequestHeader("Content-Type", episodeVideoFile.type);
+      // Perform direct upload to Cloudflare R2 with progress tracking
+      await uploadToR2WithProgress({
+        uploadUrl,
+        file: episodeVideoFile,
+        onProgress: (pct) => setUploadProgress(pct)
+      });
 
-      xhr.upload.onprogress = (event) => {
-        if (event.lengthComputable) {
-          const pct = Math.round((event.loaded / event.total) * 100);
-          setUploadProgress(pct);
-        }
-      };
-
-      xhr.onload = () => {
-        if (xhr.status === 200) {
-          setUploadedVideoUrl(videoUrl);
-          setUploadStatus("success");
-        } else {
-          setUploadStatus("failed");
-          setError(`Direct upload failed with status code ${xhr.status}.`);
-        }
-      };
-
-      xhr.onerror = () => {
-        setUploadStatus("failed");
-        setError("Network error occurred during video file upload.");
-      };
-
-      xhr.send(episodeVideoFile);
+      setUploadedVideoUrl(videoUrl);
+      setUploadStatus("success");
     } catch (err) {
-      console.error("Direct upload initialization failed:", err);
+      console.error("Direct episode upload failed:", err);
       setUploadStatus("failed");
-      setError(err.message || "Failed to initialize video upload.");
+      setError(err.message || "Failed to complete episode video upload.");
     }
   };
 

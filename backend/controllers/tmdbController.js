@@ -1,6 +1,6 @@
 import * as tmdbService from "../services/tmdbService.js";
 import { getDb } from "../config/mongodb.js";
-import { normalizeMovieUrls } from "./movieController.js";
+import { normalizeMediaUrl } from "../utils/mediaUrlHelper.js";
 
 /**
  * Handle API error response helper
@@ -112,7 +112,7 @@ export async function getMovieDetails(req, res) {
           ]
         });
         if (localMovie) {
-          normalizeMovieUrls(localMovie);
+          normalizeMediaUrl(localMovie);
         }
       }
     } catch (dbErr) {
@@ -140,7 +140,7 @@ export async function getTvDetails(req, res) {
     const tmdbId = parseInt(id, 10);
     const tmdbDetails = await tmdbService.getTvDetails(tmdbId);
 
-    // Check if there is an associated local streaming TV record by name (shows might be saved as movie records)
+    // Check if there is an associated local streaming TV record by name
     let localMovie = null;
     try {
       const db = getDb();
@@ -152,7 +152,7 @@ export async function getTvDetails(req, res) {
           ]
         });
         if (localMovie) {
-          normalizeMovieUrls(localMovie);
+          normalizeMediaUrl(localMovie);
         }
       }
     } catch (dbErr) {
