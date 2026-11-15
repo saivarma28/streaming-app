@@ -23,7 +23,7 @@ function loadRazorpayScript() {
 export default function Premium() {
   const { currentUser, dbUser, fetchDbProfile } = useAuth();
   const navigate = useNavigate();
-  
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -129,7 +129,7 @@ export default function Premium() {
         <div className="max-w-md w-full bg-[#12131a] border border-[#ffb703]/20 p-8 rounded-3xl shadow-2xl relative overflow-hidden">
           {/* Decorative Sparkles */}
           <div className="absolute -top-10 -right-10 h-32 w-32 rounded-full bg-[#ffb703]/5 blur-2xl"></div>
-          
+
           <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-tr from-[#ffb703] to-[#ff8500] text-white mx-auto mb-6 shadow-[0_4px_20px_rgba(255,183,3,0.3)]">
             <FiStar className="h-8 w-8 fill-current" />
           </div>
@@ -168,7 +168,7 @@ export default function Premium() {
       <div className="absolute bottom-1/4 right-1/4 h-[300px] w-[300px] rounded-full bg-[#ffb703]/5 blur-[120px]"></div>
 
       <div className="max-w-4xl w-full mx-auto px-4 z-10 text-center space-y-10">
-        
+
         {/* Page Title */}
         <div>
           <span className="inline-block px-3 py-1 rounded-full text-[10px] font-bold bg-[#ffb703]/10 text-[#ffb703] border border-[#ffb703]/20 uppercase tracking-widest mb-3">
@@ -191,13 +191,13 @@ export default function Premium() {
 
         {/* Pricing Layout */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-3xl mx-auto items-stretch">
-          
+
           {/* Free Tier Card */}
           <div className="bg-[#12131a]/60 border border-white/5 rounded-3xl p-8 flex flex-col justify-between text-left opacity-60">
             <div>
               <h3 className="text-lg font-bold text-gray-400 uppercase tracking-wider mb-2">Free Plan</h3>
               <p className="text-xs text-gray-500 font-light mb-6">Standard low-fidelity user registration.</p>
-              
+
               <div className="flex items-baseline mb-6">
                 <span className="text-4xl font-black text-white">₹0</span>
                 <span className="text-gray-500 text-xs font-medium ml-1">/ Month</span>
@@ -233,11 +233,11 @@ export default function Premium() {
             <div className="absolute top-4 right-4 bg-gradient-to-r from-[#ffb703] to-[#ff8500] text-black text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-md">
               Best VIP Experience
             </div>
-            
+
             <div>
               <h3 className="text-lg font-bold text-[#ffb703] uppercase tracking-wider mb-2">Premium Member</h3>
               <p className="text-xs text-gray-400 font-light mb-6">Complete unlimited access ticket.</p>
-              
+
               <div className="flex items-baseline mb-6">
                 <span className="text-5xl font-black text-white">₹199</span>
                 <span className="text-gray-400 text-xs font-medium ml-1">/ 30 Days</span>
@@ -289,7 +289,7 @@ export default function Premium() {
               </button>
             )}
           </div>
-          
+
         </div>
 
         {/* Benefits Grid */}

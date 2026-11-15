@@ -76,11 +76,10 @@ export default function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out ${
-        isScrolled
-          ? "bg-[#090a0f]/90 backdrop-blur-md shadow-lg border-b border-white/5 py-4"
-          : "bg-transparent py-6"
-      }`}
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ease-in-out ${isScrolled
+        ? "bg-[#090a0f]/90 backdrop-blur-md shadow-lg border-b border-white/5 py-4"
+        : "bg-transparent py-6"
+        }`}
     >
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-8 items-center justify-between">
@@ -103,10 +102,9 @@ export default function Navbar() {
                     key={link.name}
                     to={link.path}
                     className={({ isActive }) =>
-                      `text-sm font-medium transition-all duration-300 hover:text-white relative py-1 ${
-                        isActive
-                          ? "text-white after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:bg-gradient-to-r after:from-[#e50914] after:to-red-500"
-                          : "text-gray-400"
+                      `text-sm font-medium transition-all duration-300 hover:text-white relative py-1 ${isActive
+                        ? "text-white after:absolute after:bottom-0 after:left-0 after:h-[2px] after:w-full after:bg-gradient-to-r after:from-[#e50914] after:to-red-500"
+                        : "text-gray-400"
                       }`
                     }
                   >
@@ -136,7 +134,7 @@ export default function Navbar() {
                     Go Premium
                   </Link>
                 )}
-                <button 
+                <button
                   onClick={handleSearchClick}
                   className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer"
                 >
@@ -199,14 +197,14 @@ export default function Navbar() {
           <div className="flex md:hidden items-center gap-3">
             {currentUser && (
               <>
-                <button 
+                <button
                   onClick={handleSearchClick}
                   className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer p-1"
                   aria-label="Search"
                 >
                   <FiSearch className="h-5 w-5" />
                 </button>
-                <button 
+                <button
                   className="text-gray-400 hover:text-white transition-colors duration-300 cursor-pointer relative p-1"
                   aria-label="Notifications"
                 >
@@ -216,8 +214,8 @@ export default function Navbar() {
                     <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500"></span>
                   </span>
                 </button>
-                <Link 
-                  to="/profile" 
+                <Link
+                  to="/profile"
                   className="flex items-center text-gray-300 hover:text-white transition-all duration-300 p-1"
                   aria-label="Profile"
                 >
@@ -274,10 +272,9 @@ export default function Navbar() {
                   to={link.path}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `block text-base font-medium py-2 px-3 rounded-lg transition-all duration-300 ${
-                      isActive
-                        ? "bg-white/5 text-white border-l-4 border-[#e50914]"
-                        : "text-gray-400 hover:bg-white/5 hover:text-white"
+                    `block text-base font-medium py-2 px-3 rounded-lg transition-all duration-300 ${isActive
+                      ? "bg-white/5 text-white border-l-4 border-[#e50914]"
+                      : "text-gray-400 hover:bg-white/5 hover:text-white"
                     }`
                   }
                 >
@@ -302,7 +299,7 @@ export default function Navbar() {
                 )}
                 <span className="text-base">Account</span>
               </Link>
-              
+
               {/* Install App Link */}
               {!isStandalone && (
                 <button
@@ -320,7 +317,7 @@ export default function Navbar() {
                   Install StreamApp
                 </button>
               )}
-              
+
               <button
                 onClick={() => {
                   setIsMobileMenuOpen(false);
@@ -363,7 +360,7 @@ export default function Navbar() {
             >
               <FiX className="h-5 w-5" />
             </button>
-            
+
             <div className="flex items-center gap-3 mb-4">
               <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-[#e50914] to-orange-600 flex items-center justify-center text-white shadow-[0_0_15px_rgba(229,9,20,0.3)]">
                 <FiDownload className="h-5 w-5" />
