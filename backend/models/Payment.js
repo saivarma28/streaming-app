@@ -18,7 +18,7 @@ export class PaymentModel {
       firebaseUid: paymentData.firebaseUid,
       paymentId: paymentData.paymentId,
       orderId: paymentData.orderId,
-      amount: paymentData.amount || 9900,
+      amount: paymentData.amount || 19900,
       currency: paymentData.currency || "INR",
       status: paymentData.status || "success",
       createdAt: new Date()

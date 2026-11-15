@@ -37,7 +37,7 @@ export class PaymentService {
       throw err;
     }
 
-    const amount = 9900; // ₹99 in paise
+    const amount = 19900; // ₹199 in paise
     const currency = "INR";
     const receipt = `rcpt_${Date.now()}_${firebaseUid.substring(0, 10)}`;
 
@@ -132,7 +132,7 @@ export class PaymentService {
       firebaseUid,
       paymentId: razorpay_payment_id,
       orderId: razorpay_order_id,
-      amount: 9900,
+      amount: 19900,
       currency: "INR",
       status: "success"
     });

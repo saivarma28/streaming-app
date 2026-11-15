@@ -304,7 +304,7 @@ ADMIN VIDEO UPLOAD:
              ↓
 2. Frontend calls POST /api/payment/create-order
              ↓
-3. Backend initializes Razorpay Order for 9900 paise (INR) -> Returns order_id
+3. Backend initializes Razorpay Order for 19900 paise (INR) -> Returns order_id
              ↓
 4. Frontend launches Razorpay Checkout Modal
              ↓
